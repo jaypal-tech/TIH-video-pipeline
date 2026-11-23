@@ -1,0 +1,1144 @@
+TODAY IN HISTORY · SHORT SERIES · PRODUCER BRIEF
+Lincoln: The Conspiracy
+Make episodes 1–5 of this series. Your creativity is what we're looking for.
+The brief
+Draft scripts
+Cast
+The true story
+Logline: one night, one actor, three targets: the President, the Vice President and the Secretary of State, all at 10:15. Grant would have made it four, but he left town that afternoon.
+In 30 seconds
+	•	Make episodes 1–5 of this series. Each episode must run between 60 and 90 seconds, vertical.
+	•	The feel: as close as you can get to a DramaBox or NetShort episode, but every story is true.
+	•	Due: Monday, November 30. Show us episode 1 by Wednesday, November 25.
+	•	Generation costs: we cover them. Log every call (see below).
+	•	Hand-in: put everything in a Google Drive folder and send us the link.
+	•	What matters most is your creativity. Your choices as a director make these worth watching. Show us what you'd make.
+What we're making
+A true-history drama series for the Today In History app: about 30 episodes of about a minute each. These are short films in a series, not one-off clips and not ads. People binge them, so every episode has to make them tap the next one.
+The feel we want: DramaBox and NetShort
+Download both and watch the first few episodes of 3–4 series before you start. That's the bar.
+	•	DramaBox: iPhone · Android
+	•	NetShort: iPhone · Android
+What makes a vertical short drama work
+We timed and watched 100 DramaBox episodes from 13 hit series (47M–310M views each). Here's what they have in common. Treat it as the craft guide.
+Pace
+
+DramaBox measured
+For our 60–90 s episodes
+Episode length
+ep 1 ≈ 2:45; later eps ≈ 1:50
+60–90 s
+Shot length
+1.6–1.7 s, about 30 cuts a minute
+same
+First spoken line
+by 1.3 s
+in the first 2 s
+First conflict
+by 8 s
+in the first 8 s
+Twists or reveals
+about 7 per episode, one every ~16 s
+4–5 per episode
+Final twist
+5–8 s before the end, nothing resolved after it
+same
+Faces and dialogue
+	•	67% of lines are said on the speaker's face, lip-synced in close-up. 27% play over a reaction or off-screen; 6% are inner voice.
+	•	Someone is talking about 55% of the time.
+	•	Lines are short: about 5 words, almost never over 12.
+	•	Close-ups dominate. Wide shots set a room once, then it's faces, eyes, hands and reactions.
+Structure
+	•	Episode 1 opens cold, often on a flash-forward plus a time card ("72 hours earlier").
+	•	Later episodes open on the previous episode's cliff (72% of them).
+	•	One or two scenes per episode. One room, two faces in conflict, a secret.
+	•	Cliffhangers, from most to least common: a reveal, a decision, a threat, an arrival, violence, a kiss or touch, a deal, a humiliation.
+On screen, in every series
+	•	Burned-in captions.
+	•	A name card with a role on each character's first appearance.
+	•	Inserts of a phone, letter or object that matters.
+Common touches
+	•	Slow motion at the peak moments.
+	•	Music stings and sound hits on every reveal.
+	•	A white flash on the last frame.
+Our difference: it all really happened.
+The few hard rules
+	1	It's true. No invented facts. Dramatized dialogue is fine. Lines marked REAL WORDS are said exactly as written.
+	2	Each episode runs 60–90 s. Vertical 9:16 (1080×1920).
+	3	Same face, same voice. Each character looks and sounds like the same person in every shot and every episode.
+	4	Story from the first second. No long title cards or slow intros.
+	5	Every episode ends on a hook that makes you want the next one.
+	6	Burned-in captions, readable on a phone.
+Everything else is yours
+	•	Direction: shots, framing, camera, pacing, the edit.
+	•	Look: palette, light, texture, casting. All yours.
+	•	Sound: voices, music, sound design.
+	•	Tools and models: any you like, your own pipeline included.
+	•	The scripts: our drafts are below. Use them, sharpen them, or rewrite them, as long as it stays true and each episode still lands its hook. Tell us what you changed and why.
+Schedule
+When
+What
+Kickoff
+Read this page. Ask questions in Slack (message Manuel).
+Wednesday, November 25
+Episode 1 rough cut, plus the character looks and voices you've chosen. We give quick feedback.
+Monday, November 30
+Episodes 1–5 final, plus all assets, the generation log, the report and the pipeline.
+Why we're doing this
+We've been working together for a bit, so this is a good time to take stock. You should be ramped up enough to take a pipeline like this from zero to one on your own. This project is a chance to show it. It's the same kind of work we'll need for Today In History and our other platforms.
+What you hand in
+Send everything you made, including what you threw away, so we can learn from all of it.
+1. The finished episodes
+	•	Episodes 1–5 as final MP4s: H.264, 1080×1920, 24 or 30 fps, dialogue around −16 LUFS.
+2. Every generated asset, kept and rejected
+	•	Every image, video clip, voice line, music and sound file you generated, in folders by episode and clip.
+	•	The rejects too, each marked with why it was rejected.
+3. A generation log (CSV or JSON, one row per API call)
+Field
+Example
+timestamp
+2026-11-24T14:03:11Z
+episode / clip / shot
+2 / 3 / 7
+step
+keyframe, video, voice, music, sfx, lip-sync, upscale, judge, script…
+provider and model
+fal / kling-v4 720p
+key settings
+duration, resolution, seed, voice id
+prompt
+the full text
+inputs
+the reference images and audio used
+output file
+path in your upload
+cost (USD)
+0.94
+time taken
+182 s
+kept?
+yes / no, and why not
+4. Services and accounts used
+	•	Every API and service you used (fal, ElevenLabs, OpenAI and so on), with the plan or tier and the total billed for this project.
+	•	Send the service names only, never the API keys themselves.
+5. The report (one document)
+	•	Cost: per episode and in total, broken down by step and model; cost per finished minute.
+	•	Keep rate: clips generated vs clips used, per step.
+	•	Time: hours of your hands-on work per episode, and machine time per episode.
+	•	Quality: how you kept faces and voices consistent, and where it still slips.
+	•	Your creative choices: what you changed from the draft scripts and why.
+	•	What broke and how you fixed it.
+	•	Scale: what it would take to make all 30 episodes, a new series every month, or a daily episode, at what cost and how much of it automated.
+6. The pipeline
+	•	Your code or workflow, pushed to a repo we can read, with a README.
+	•	The README should say how to re-run one episode from its script.
+How we'll look at it
+The team watches the episodes and picks favorites, then we look at the numbers together:
+
+We ask
+Drama
+Does it feel like DramaBox or NetShort? Do we want to watch episode 2?
+Your creative voice
+Does it feel directed, with real choices behind it?
+Craft
+Faces and voices consistent, acting and lip-sync, clean sound, readable captions.
+Truth
+No invented facts. Real quotes said exactly.
+Cost and speed
+Dollars and hours per finished minute.
+Tracking
+Is every call, cost and asset logged and easy to analyze?
+Engineering
+Is the pipeline repeatable, documented and reusable beyond this series?
+Could it scale?
+Could your way of working make 30 episodes?
+Your starting material
+Below:
+	•	our draft scripts;
+	•	the cast, with what the real people looked like;
+	•	the true story with its sources.
+Use as much or as little as you like.
+The draft scripts
+Our starting point. Use them, sharpen them, or rewrite them, as long as it stays true and each episode lands its hook.
+Lincoln: The Conspiracy: Season 1, episodes 1–5
+Status: v1, 2026-11-22. Writing only, $0. This follows the format update of 2026-11-21 (FLAGSHIPS.md, last section): about 30 episodes of about 60 s each. Layout follows GARBO-SEASON-30x60.md §3. Clip tables follow OURS-MAX-HEADROOM-EP.md. Facts, cast and look come from series/lincoln-the-conspiracy.md. Nothing here is locked until the checks in §5 are done.
+For the pipeline that films this:
+	•	One clip, one setup. Each clip is one situation in one place, with no time jump inside it. Stay inside the clip's place and framing.
+	•	Text is never on a prop. Every word the viewer reads (name cards, TRUE cards, time supers, tags, captions) is a graphic overlay. Letters, cards and newspapers are shown soft or edge-on, and their words come through a voice.
+	•	No title card and no end card. A 1 s corner bug ("LINCOLN: THE CONSPIRACY · 1") sits over live picture at 0:00–0:01. Each episode ends on its freeze plus TRUE card. Nothing comes after it.
+	•	No flash-forward cold opens. This follows the Garbo format. The v2 cold open (the laugh line in the box) previewed the payoff, so it is dropped. Each hook comes from inside the episode's first scene.
+	•	Delivery legend:
+	•	face: on screen and lip-synced.
+	•	off: spoken over a reaction shot or from off screen.
+	•	inner: the character's thoughts, set in italic captions.
+	•	Tag legend:
+	•	REAL WORDS · year: documented wording, quoted exactly.
+	•	REPORTED · …: a recollection or a later report of what someone said. The tag shows the chain when it is second- or third-hand.
+	•	TRUE card: a documented fact, stamped full width.
+	•	Untagged lines are written for the drama, and no untagged line ever closes an episode.
+
+1. Season premise and the 30-episode arc
+Premise: On April 11, 1865, two days after Lee's surrender, a famous young actor stands in the crowd outside the White House and hears Lincoln support the vote for some Black men. Three days later he has a plan: the President, the Vice President and the Secretary of State, on one night, at one hour. General Grant would have made it four, but he left town that afternoon. Everyone knows how the night ends. Almost nobody knows the road to it:
+	•	a boarding-house widow carrying a package to a country tavern;
+	•	a calling card left at the Vice President's hotel;
+	•	a hit man who went to the bar instead;
+	•	a knife in a sick man's bedroom;
+	•	after the night, a 12-day manhunt and a conspirator who got away for two years.
+Where eps 1–5 sit: they are the first half of the countdown, from April 11 to 8 pm on April 14. Together they set up:
+	•	the motive;
+	•	the box, and Grant's refusal;
+	•	the weapons;
+	•	the card;
+	•	the plan itself: three targets at one hour.
+They spend none of the payoff. The shot comes in ep 12, after the late wall. The knife, Lincoln's death and the manhunt come after that.
+Paywall:
+	•	The early wall is after ep 5 (founder's candidate). Ep 5 has the strongest cliff of the first five. The whole plan is revealed: the President, the Vice President, and the Secretary of State in his sickbed, at about 10:15. The TRUE card names all three. The viewer knows the night is coming, and every road to it is behind the wall.
+	•	The late wall is after ep 11. Ep 11 closes on real words, the play's laugh line, with the hammer drawn back. If the wall moves to ep 5, ep 11 stays the season's biggest held breath.
+Ep
+Title
+One-line outline
+1
+The Last Speech
+Apr 11, the White House lawn. Lincoln backs the vote for some Black men, and Booth, in the crowd, decides. (full script below)
+2
+The Box
+Apr 14, morning. Grant turns down the President's box at Ford's, and at noon Booth hears the President is coming to his own theatre. (full script below)
+3
+Shooting Irons
+Apr 14, afternoon. Booth hands Mary Surratt a parcel, and she carries it to her tavern with a message for its keeper. (full script below)
+4
+The Card
+Apr 14, afternoon. Booth leaves a signed card at the Vice President's hotel, and Atzerodt is upstairs in a room he took that morning. (full script below)
+5
+Ten Fifteen
+About 4 pm: Grant's carriage leaves for the train and a rider stares in (Julia Grant's later account). 8 pm, the Herndon House: three targets, one hour. ← EARLY WALL (candidate) (full script below)
+6
+More Cheerful
+A step back to that afternoon: Lincoln's carriage ride with Mary ("we must both be more cheerful", REPORTED), cut against Booth alone at the door of the empty box (accounts say). It ends as the Lincolns leave for the theatre.
+7
+Hail to the Chief
+8:30 pm. The Lincolns arrive late with Rathbone and Clara Harris, the band plays, and the guard, John Parker, leaves his post (accounts say).
+8
+The Bar
+10 pm, the Kirkwood House bar. Atzerodt drinks, and Johnson sleeps upstairs. He never knocks.
+9
+Medicine from Dr. Verdi
+About 10:05 pm, Lafayette Square. Powell talks his way into Seward's house, and Frederick Seward blocks the stairs.
+10
+The Empty Chair
+Elmira, New York: John Surratt is far away by his own later account, the tease for the one who gets away. At Ford's, Booth climbs past the empty guard chair and shows his card at the box.
+11
+The Laugh
+10:14 pm, both houses at once. Seward's bedroom door bursts open. At Ford's, the passage door is barred and the line lands: "You sockdologizing old man-trap!" REAL WORDS. ← LATE WALL
+12
+The Shot and the Knife
+The shot and the knife at the same minute, the brace, Rathbone stabbed, the leap and the spur.
+13
+I'm Mad
+Powell runs out into the street (REPORTED). Lincoln is carried across to the Petersen House.
+14
+7:22
+April 15. Lincoln dies, and Stanton runs the government from the next room ("ages" or "angels", disputed).
+15
+The Doctor
+4 am, Dr. Mudd's farm. He sets the leg of a man he had met before.
+16
+The Gutter
+April 17. Powell knocks at the Surratt house with a pickaxe while detectives are inside. "Before God, sir, I do not know this man" (REAL WORDS, trial).
+17
+The Pine Thicket
+Booth and Herold hide in a Maryland thicket, fed by Thomas Jones.
+18
+Hunted Like a Dog
+Booth's diary, and the newspapers that call him a coward, not a hero.
+19
+The Weak Link
+Atzerodt is arrested at his cousin's farm, and the reward posters go up.
+20
+The River
+The failed Potomac crossing, and finally Virginia.
+21
+Garrett's Barn
+April 26. The barn is set on fire, Corbett fires against orders, and Booth says "Useless, useless" (documented).
+22
+The Ironclads
+The arrested men are held hooded aboard monitors in the Navy Yard. Booth's body is brought aboard.
+23
+The Hoods
+May. Eight defendants before a military court.
+24
+The Daughter
+Anna Surratt begs at the White House door for her mother's life.
+25
+July 7
+Four are hanged, and Mary Surratt is the first woman executed by the federal government. The series stays honest that her guilt is argued to this day.
+26
+The One Who Ran
+John Surratt hides in Canada, then England.
+27
+The Pope's Soldier
+Surratt enlists in the Papal Zouaves under a false name, and a fellow soldier recognises him.
+28
+The Cliff
+Surratt is arrested, leaps from a cliff at Veroli and escapes, and is caught in Alexandria, Egypt.
+29
+Hung Jury
+1867. The jury deadlocks, and the last conspirator walks free. He lives until 1916.
+30
+The Brothers
+Coda: Rathbone and Clara, 1883. Edwin Booth once pulled Robert Lincoln off the tracks at Jersey City.
+
+2. Cast and location sheets (eps 1–5)
+	•	Light: gaslight amber and moon blue, one motivated practical source per interior, and haze.
+	•	Grade: wet-plate vignette, fine 35mm grain.
+	•	Color: bunting red is the only saturated color.
+	•	Lenses: MCU and CU on an 85mm with eyes on the top-third line of the 9:16 frame, medium shots on a 50mm, one 28mm wide per place.
+The reference faces are in ~/Data/OpenMontage/tih-history-series/candidates/lincoln-ep1/look/.
+Cast
+Character
+Eps
+Name card (first appearance)
+Look (lock for every clip)
+Voice (lock)
+John Wilkes Booth
+1–5
+JOHN WILKES BOOTH · America's matinee idol · 26
+Build: 5'8", athletic, pale skin, dark eyes. Hair: jet-black curly hair and a black mustache. Wardrobe: black broadcloth frock coat, white high collar, black silk cravat, black slouch hat. Tell: black kid gloves he takes off and puts on. Casting: magnetic, never a heartthrob (ref 02-booth.png).
+A trained stage voice: mid baritone, a Maryland gentleman's diction, controlled and musical. He gets quieter, never louder, when he means it.
+Lewis Powell
+1, 5
+LEWIS POWELL · Confederate veteran · 20
+Build: 6'2", heavy shoulders and jaw. Face: thick dark hair, a flat unblinking stare. Wardrobe: a worn dark wool coat too tight across the back, a rough collarless shirt, a wide hat (ref 04-powell.png).
+Low and slow, a Deep South drawl. Few words, no wasted breath.
+Abraham Lincoln
+1–2
+ABRAHAM LINCOLN · President · 56
+Build: 6'4", gaunt. Face: deeply lined and hollow-cheeked, coarse black hair, chin beard and no mustache, grey eyes. Wardrobe: a loose black frock coat that looks slept in, a narrow black bow tie (ref 03-lincoln.png).
+Locked: high-pitched, thin and reedy, a carrying tenor with a Kentucky accent. Never a deep movie baritone.
+Tad Lincoln
+1
+TAD LINCOLN · his son · 12
+Build: small for 12. Look: tousled hair, a dark boy's jacket.
+Silent.
+Ulysses S. Grant
+2
+ULYSSES S. GRANT · General-in-Chief · 42
+Build: 5'8", slightly stooped. Face: a short brown beard, cropped. Wardrobe: a plain dark-blue undress frock coat with shoulder straps and no sash. Prop: an unlit cigar in his hand.
+Quiet, flat Midwestern (Ohio). Short sentences. Never raises it.
+Harry Clay Ford
+2
+HARRY FORD · Ford's Theatre, box office
+Build: about 20. Face: clean-shaven, quick. Wardrobe: shirtsleeves and a waistcoat, sleeve garters.
+Bright, Baltimore, a friend's teasing tone.
+Mary Surratt
+3
+MARY SURRATT · boarding-house owner · 42
+Build: stout and upright. Hair: dark, parted in the centre and drawn back. Eyes: grey. Wardrobe: a plain black widow's dress with a small white collar and a crucifix at the throat. Note: her face is designed, not matched, because the attributed photographs are disputed (ref 05-mary-surratt.png).
+A low, measured Maryland alto. A churchgoer's composure that never cracks on screen.
+Louis Weichmann
+3
+LOUIS WEICHMANN · her boarder · 22
+Build: about 22, round-faced, heavy-set. Wardrobe: a clerk's dark suit, a bowler, gloves. Manner: eager to please.
+Quick, slightly nasal, a city clerk (raised in Philadelphia).
+John M. Lloyd
+3
+JOHN LLOYD · tavern keeper, Surrattsville
+Build: 40s, thick-set, ruddy. Wardrobe: a rumpled country coat, collar undone. State: unsteady, drink in him.
+A rough southern-Maryland country voice, a little slurred.
+The desk clerk
+4
+THE DESK CLERK · Kirkwood House
+Build: 30s. Look: pomaded hair, a black coat, a pen behind his ear.
+Polite, neutral hotel voice.
+George Atzerodt
+4–5
+GEORGE ATZERODT · carriage painter · 29
+Build: small and stooped. Look: scruffy beard, a shabby stained coat, a crumpled hat beside him. Prop: always a glass.
+Silent in ep 4. From ep 5: a German (Prussian) accent, nervous, the voice rising when he's frightened.
+William A. Browning
+4
+WILLIAM BROWNING · the Vice President's secretary
+Build: 30s, neat. Wardrobe: a dark frock coat, a document case under his arm.
+Mild, Tennessee upland accent, curious more than alarmed.
+John Matthews
+5
+JOHN MATTHEWS · actor, Booth's friend
+Build: 30s, an actor's face. Look: clean-shaven, a light overcoat and a top hat.
+Silent in ep 5.
+Julia Dent Grant
+5
+JULIA GRANT · the General's wife · 39
+Build: small. Hair: dark, center-parted. Wardrobe: a dark travelling dress and bonnet. Face: a slight cast in one eye (documented strabismus), shown in three-quarter view, never played for effect.
+Silent.
+David Herold
+5
+DAVID HEROLD · druggist's clerk · 22
+Build: boyish and slight, with a wisp of a mustache. Wardrobe: a cheap short jacket and checked trousers. Prop: a pocket watch.
+Silent in ep 5. Later: a young, eager Maryland voice.
+Speaking parts per episode:
+	•	Ep 1: 3 speakers (Booth, Powell, Lincoln).
+	•	Ep 2: 4 speakers, in two pairs (Lincoln and Grant, Booth and Harry Ford).
+	•	Ep 3: 4 speakers (Booth, Mary Surratt, Weichmann, Lloyd). Booth speaks only in clip 1.
+	•	Ep 4: 3 speakers (Booth, the clerk, Browning).
+	•	Ep 5: 3 speakers (Booth, Powell, Atzerodt). Matthews, the Grants and Herold are silent.
+Locations
+ID
+Place
+Ep
+Build and light
+L1
+White House north lawn, the crowd
+1
+Time and weather: night, drizzle. Crowd: thousands of umbrellas and torches. Light: torch-amber faces, moon-blue rain. Sound: a brass band that stops when he starts. Background: the White House north front, dark except one lit window.
+L2
+The window above the north portico
+1
+Shooting angle: from slightly below and outside, looking up into the window. Light: one candle, held by a hand from frame left (the holder is never seen). Props: loose manuscript pages. Action: Tad on the floor just inside, catching the pages.
+L3
+The President's office, White House
+2
+Time: late morning. Light: tall windows, cold daylight, a gas jet unlit. Props: a long table, papers, chairs pushed back after a meeting.
+L4
+Ford's Theatre box office
+2
+Time: noon. Build: a narrow wooden counter, pigeonholes of mail, a street door with daylight behind it. Props: a ledger on the counter.
+L5
+Ford's Theatre auditorium, empty
+2
+Time: noon. Light: dust in one shaft of light from a high window, the gas jets off. Build: the state box upper stage right, two dark boxes joined into one, with two empty chairs visible. The flags are not yet hung. Background: a stagehand far off on the stage, sweeping.
+L6
+The Surratt boarding-house parlor, H Street
+3
+Time: afternoon. Look: a plain respectable parlor, a crucifix on the wall. Light: lace curtains, soft grey light. Build: a hall doorway at frame right.
+L7
+A country road, Prince George's County, Maryland
+3
+Time and season: afternoon, early spring. Look: bare fields, rutted mud, a split-rail fence. Props: a hired one-horse buggy.
+L8
+The Surratt tavern yard, Surrattsville
+3
+Time: about 5 pm, low sun. Build: a two-storey clapboard tavern, a woodpile, a second buggy pulling in.
+L9
+Kirkwood House lobby, front desk
+4
+Time: afternoon. Build: a mahogany desk, a pigeonhole rack behind it, a brass bell, a tray of blank cards and a pen. Light: gas jets lit low against a dim afternoon.
+L10
+A small upstairs room, Kirkwood House
+4
+Time: afternoon. Light: curtains half drawn, a thin bar of daylight. Props: an iron bed, a washstand, a bottle and a glass. Sound: the corridor door shut, footsteps outside.
+L11
+Pennsylvania Avenue
+5
+Time: about 4 pm, low spring sun. Street: a wide unpaved avenue, horse traffic, a plank sidewalk. Props: Booth on a rented bay mare at the curb, and an open carriage passing with a cavalry escort behind.
+L12
+A rented room, Herndon House
+5
+Time: 8 pm. Light: one candle on the washstand, nothing else. Build: a narrow room, a bed with a map of Washington spread on it (its lines shown, its words unreadable), a hat on the bedpost.
+
+3. The five scripts
+EP 1: "The Last Speech"
+Runtime: 1:12 · 5 clips · 2 places (L1 crowd, L2 window) · no time jump · speaking cast: Booth, Powell, Lincoln.
+Hook (0:00–0:03): Booth, in the crowd, gives the first line: he wants the President shot right now. There's no cold open and no legend.
+Super, 0:00–0:01, over live picture: corner bug "LINCOLN: THE CONSPIRACY · 1", plus small type at the top: "WASHINGTON · APRIL 11, 1865".
+Clip 1 · White House lawn, in the crowd · night · 0:00–0:13
+t
+PIC
+LINE
+0:00
+MCU Booth, hat low, drizzle on the brim, torchlight on one side of his face, his eyes fixed up and past the camera.
+BOOTH (face, low): "You could hit him from here."
+0:03
+MCU Powell, a head taller than everyone around him, rain on his hat, his eyes on the window. NAME CARD: LEWIS POWELL · Confederate veteran · 20
+POWELL (face): "Not in this crowd."
+0:07
+MCU Booth turns to him. NAME CARD: JOHN WILKES BOOTH · America's matinee idol · 26
+BOOTH (face): "Then why are you here?"
+0:10
+Two-shot, medium: Powell doesn't answer. The crowd jostles them and torches pass between them.
+
+Clip 2 · The window above the north portico · same moment · 0:13–0:27
+t
+PIC
+LINE
+0:13
+28mm wide from the lawn, looking up: umbrellas and torches, and one lit window above the portico. The band stops.
+
+0:16
+MCU Lincoln in the window, reading from a loose page. A hand from frame left holds the candle. NAME CARD: ABRAHAM LINCOLN · President · 56
+LINCOLN (face): "We meet this evening, not in sorrow, but in gladness of heart." REAL WORDS · 1865
+0:23
+Medium shot, just inside the window and low: a finished page drops, and Tad catches it before it hits the floor. NAME CARD: TAD LINCOLN · his son · 12
+
+Clip 3 · The lawn, in the crowd · 0:27–0:40
+t
+PIC
+LINE
+0:27
+MCU Booth, pulling one glove off finger by finger, his eyes on the window.
+BOOTH (face): "One shot, Lewis. In the dark."
+0:32
+MCU Powell, unmoving.
+POWELL (face): "And a thousand men on top of me."
+0:36
+MCU Booth: a thin smile, and the glove goes back on.
+
+Clip 4 · The window · 0:40–0:53
+t
+PIC
+LINE
+0:40
+CU Lincoln, the page close to the candle.
+LINCOLN (face): "I would myself prefer that it were now conferred on the very intelligent," REAL WORDS · 1865
+0:46
+CU Lincoln looks up from the page, out at the crowd. Overlay super, lower third, 2 s: "HE MEANS THE VOTE. FOR SOME BLACK MEN."
+LINCOLN (face): "and on those who serve our cause as soldiers." REAL WORDS · 1865
+Clip 5 · The lawn, in the crowd · 0:53–1:12
+t
+PIC
+LINE
+0:53
+CU Booth, rain running down his face. Around him, men cheer. He doesn't.
+BOOTH (face, low, to Powell): "That means … citizenship." REPORTED · THIRD-HAND · 1867
+0:58
+MCU Booth turns his back on the window and speaks past Powell's shoulder.
+BOOTH (face): "That is the last speech he will ever make." REPORTED · THIRD-HAND · 1867
+1:02
+28mm wide: Booth shoulders out through the torches, and Powell follows. Far behind them, Lincoln, small in the lit window, reads on.
+
+1:05
+Push in on the empty space where Booth stood. TRUE card: "THREE DAYS LATER, HE PICKED THREE TARGETS. ONE NIGHT. ONE HOUR." Stamp thump. Freeze. White flash.
+
+1:12
+END
+
+Beat check:
+
+Target
+Ep 1
+Runtime
+60–90 s
+1:12
+Clips
+4–6 of 10–15 s
+5 (13 · 14 · 13 · 13 · 19). Clip 5 includes the 7 s freeze and card.
+Hook in 3 s
+yes
+0:00, "You could hit him from here."
+Conflict
+2+ characters
+Booth wants the shot now, and Powell refuses. Booth against the man in the window.
+Speaking cast
+small
+3
+Cliff
+real fact, real words or a tagged recollection
+REPORTED (third-hand, tagged on screen), then a TRUE card. Nothing written comes after them.
+Payoff spent
+none
+none
+Where ep 2 opens: three days later, the President's office, 11 am. Lincoln offers General Grant a seat at the theatre.
+
+EP 2: "The Box"
+Runtime: 1:08 · 5 clips · 3 places (L3 office, L4 box office, L5 auditorium) · 1 time jump (11 am to noon, between clips 2 and 3) · speaking cast: Lincoln, Grant, Booth, Harry Ford.
+Hook (0:00–0:03): the President offers Grant the box. The viewer learns Grant won't be in it before Booth does.
+Super, 0:00–0:01: corner bug "LINCOLN: THE CONSPIRACY · 2", plus small type: "APRIL 14, 1865 · 11 AM".
+Clip 1 · The President's office, White House · 11 am · 0:00–0:14
+t
+PIC
+LINE
+0:00
+MCU Lincoln, seated sideways at the long table after a meeting, chairs pushed back behind him, looking up at someone.
+LINCOLN (face): "Mrs. Lincoln has a box at Ford's tonight. For you, General."
+0:05
+MCU Grant, standing, an unlit cigar in his fingers. NAME CARD: ULYSSES S. GRANT · General-in-Chief · 42
+GRANT (face): "Mrs. Grant wants the evening train, sir."
+0:09
+MCU Lincoln, leaning in.
+LINCOLN (face): "The people want to see you."
+Clip 2 · Same office · moments later · 0:14–0:26
+t
+PIC
+LINE
+0:14
+MCU Grant, not moving an inch.
+GRANT (face): "Our children are in New Jersey."
+0:18
+MCU Lincoln: a long beat, then a tired half-smile.
+LINCOLN (face): "Then we'll go without you."
+0:22
+28mm wide: Grant puts on his hat and walks out, and Lincoln is left alone at the long table.
+
+Clip 3 · Ford's Theatre box office · noon · 0:26–0:40
+t
+PIC
+LINE
+0:26
+Medium shot: Booth comes in from the street, daylight behind him, and touches his hat. Harry Ford is behind the counter. NAME CARD: HARRY FORD · Ford's Theatre, box office
+HARRY (face): "Your mail, John."
+0:30
+Insert: Harry's hand slides a bundle of letters across the counter. The writing on them is out of focus.
+HARRY (off): "And you'll want to see the house tonight."
+0:34
+MCU Harry, grinning, pleased to be the one telling him.
+HARRY (face): "The President's coming. And General Grant."
+0:37
+CU Booth's hand, stopped flat on the letters.
+
+Clip 4 · Same box office · 0:40–0:52
+t
+PIC
+LINE
+0:40
+MCU Booth looks up with an easy smile, the actor's face.
+BOOTH (face): "Both of them? Tonight?"
+0:43
+MCU Harry.
+HARRY (face): "They sent over this morning. The state box."
+0:47
+MCU Booth taps the letters on the counter and turns to go.
+BOOTH (face): "Then you'll sell out."
+Clip 5 · Ford's Theatre auditorium, empty · noon · 0:52–1:08
+t
+PIC
+LINE
+0:52
+28mm wide from the back of the house: empty seats, dust in one shaft of light, and Booth alone in the aisle. Upper stage right, the state box holds two empty chairs.
+
+0:56
+MCU Booth looks up at the box. Slow push in. The pocket-watch tick starts.
+
+1:00
+POV up to the box: the two empty chairs. TRUE card: "LINCOLN HAD WATCHED BOOTH ACT ON THIS STAGE. NOVEMBER 1863." Stamp thump. Freeze. White flash.
+
+1:08
+END
+
+Beat check:
+
+Target
+Ep 2
+Runtime
+60–90 s
+1:08
+Clips
+4–6 of 10–15 s
+5 (14 · 12 · 14 · 12 · 16). Clip 5 includes the freeze and card.
+Hook in 3 s
+yes
+0:00, "Mrs. Lincoln has a box at Ford's tonight. For you, General."
+Conflict and secret
+yes
+Lincoln wants Grant and is refused. Booth hides his reaction from his friend. The viewer knows Grant won't come, and Booth doesn't.
+Speaking cast
+small
+4, in two pairs that never meet
+Cliff
+real fact
+TRUE card, documented
+"Three, not four"
+Grant left town
+Set up here. Grant declines, and the carriage to the train is ep 5.
+Where ep 3 opens: 2:30 pm, H Street. Booth is in Mary Surratt's parlor, holding out a small parcel.
+
+EP 3: "Shooting Irons"
+Runtime: 1:08 · 5 clips · 3 places (L6 parlor, L7 road, L8 tavern yard) · 2 time jumps (between clips 2 and 3, and between clips 3 and 4, both on the same afternoon) · speaking cast: Booth, Mary Surratt, Weichmann, Lloyd.
+Hook (0:00–0:03): Booth hands a widow a parcel and an order.
+Super, 0:00–0:01: corner bug "LINCOLN: THE CONSPIRACY · 3", plus small type: "APRIL 14 · 2:30 PM".
+Clip 1 · The Surratt parlor, H Street · 2:30 pm · 0:00–0:13
+t
+PIC
+LINE
+0:00
+MCU Booth, standing, holding out a small parcel wrapped in brown paper and tied with string.
+BOOTH (face): "Take this to the tavern. Today."
+0:03
+MCU Mary Surratt, very still, her hands folded at her waist. NAME CARD: MARY SURRATT · boarding-house owner · 42
+MARY (face): "I'm going anyway. A man owes me money."
+0:08
+MCU Booth.
+BOOTH (face): "Give it to Lloyd. Only Lloyd."
+0:11
+Insert: her hands take the parcel.
+
+Clip 2 · Same parlor, at the hall doorway · moments later · 0:13–0:25
+t
+PIC
+LINE
+0:13
+Medium shot: Weichmann in the doorway in coat and gloves. NAME CARD: LOUIS WEICHMANN · her boarder · 22
+WEICHMANN (face): "Buggy's outside, Mrs. Surratt."
+0:16
+MCU Weichmann. His eyes go to Booth, then drop to the parcel.
+WEICHMANN (face): "What's in it?"
+0:19
+MCU Mary walks past him. Booth, behind her and out of focus, watches.
+MARY (face): "Something breakable. Mind the ruts."
+Clip 3 · A country road, Maryland · that afternoon · 0:25–0:37
+t
+PIC
+LINE
+0:25
+28mm wide: a one-horse buggy on a rutted road between bare fields. Weichmann drives, and Mary sits upright beside him.
+
+0:29
+Two-shot, MCU, from the front of the buggy: the parcel sits on Mary's lap, under both her hands.
+WEICHMANN (face): "All this way for one debt?"
+0:33
+MCU Mary, eyes on the road.
+MARY (face): "Drive, Mr. Weichmann."
+Clip 4 · The Surratt tavern yard, Surrattsville · about 5 pm · 0:37–0:50
+t
+PIC
+LINE
+0:37
+Medium shot, low sun: a second buggy rattles into the yard. Lloyd climbs down, unsteady, and catches the wheel. NAME CARD: JOHN LLOYD · tavern keeper, Surrattsville
+
+0:42
+Two-shot by the woodpile: Mary holds out the parcel.
+MARY (face): "Keep this for tonight."
+0:46
+MCU Lloyd takes it and weighs it in his hand.
+LLOYD (face): "For who?"
+Clip 5 · Same yard, close · 0:50–1:08
+t
+PIC
+LINE
+0:50
+CU Mary, close to him, her voice low.
+MARY (face): "Have those shooting irons ready tonight." REPORTED · LLOYD'S TRIAL TESTIMONY · 1865
+0:55
+CU Lloyd, sobering.
+MARY (off): "There will be parties to call for them." REPORTED · LLOYD'S TRIAL TESTIMONY · 1865
+0:59
+MCU Lloyd's eyes lift to the upstairs windows of the tavern.
+
+1:01
+28mm wide: the tavern in the last light, Mary's buggy turning away. TRUE card: "TWO CARBINES WERE HIDDEN IN THIS TAVERN." Stamp thump. Freeze. White flash.
+
+1:08
+END
+
+Beat check:
+
+Target
+Ep 3
+Runtime
+60–90 s
+1:08
+Clips
+4–6 of 10–15 s
+5 (13 · 12 · 12 · 13 · 18). Clip 5 includes the freeze and card.
+Hook in 3 s
+yes
+0:00, "Take this to the tavern. Today."
+Conflict and secret
+yes
+Weichmann asks, and Mary deflects. Lloyd asks, and she gives the order.
+Speaking cast
+small
+4. Booth speaks only in clip 1.
+Cliff
+tagged recollection, then a real fact
+REPORTED (Lloyd's testimony), then a TRUE card
+Payoff spent
+none
+Who calls for the guns, and her fate, both stay behind the wall.
+Where ep 4 opens: the same afternoon, a hotel desk on Pennsylvania Avenue. Booth asks for the Vice President.
+
+EP 4: "The Card"
+Runtime: 1:08 · 5 clips · 2 places (L9 lobby, L10 upstairs room) · 1 time jump (to about 5 pm, between clips 3 and 4) · speaking cast: Booth, the clerk, Browning. Atzerodt appears silent.
+Hook (0:00–0:03): Booth, at a hotel desk, asks for the Vice President by name.
+Super, 0:00–0:01: corner bug "LINCOLN: THE CONSPIRACY · 4", plus small type: "KIRKWOOD HOUSE · APRIL 14 · AFTERNOON".
+Clip 1 · Kirkwood House lobby, front desk · afternoon · 0:00–0:13
+t
+PIC
+LINE
+0:00
+MCU Booth at the desk, gloves off, charming.
+BOOTH (face): "Is the Vice President in?"
+0:03
+MCU the clerk. NAME CARD: THE DESK CLERK · Kirkwood House
+CLERK (face): "Out, sir."
+0:05
+MCU Booth.
+BOOTH (face): "His secretary? Mr. Browning?"
+0:08
+MCU the clerk.
+CLERK (face): "Also out. Can I take a message?"
+0:11
+MCU Booth: a beat, then a smile.
+
+Clip 2 · Same desk · 0:13–0:27
+t
+PIC
+LINE
+0:13
+Insert: Booth takes a blank card from the tray and dips the pen. The pen moves across the card, soft and unreadable.
+BOOTH (off, under his breath as he writes): "Don't wish to disturb you. Are you at home?" REAL WORDS · 1865
+0:20
+Two-shot, medium: Booth signs with a flourish and slides the card across. The clerk glances at the name.
+CLERK (face): "Booth? The actor?"
+0:24
+MCU Booth, pulling his gloves back on.
+BOOTH (face): "Put it in his box."
+Clip 3 · A small upstairs room, Kirkwood House · same afternoon · 0:27–0:39
+t
+PIC
+LINE
+0:27
+Medium shot: Atzerodt sits on the edge of an iron bed in his coat, a glass in his hand, a bar of daylight across him. NAME CARD: GEORGE ATZERODT · carriage painter · 29
+
+0:31
+MCU Atzerodt: footsteps in the corridor, and he freezes, glass halfway up. Overlay super, lower third, 2 s: "HE TOOK THIS ROOM THAT MORNING."
+
+0:35
+The footsteps pass. He drinks.
+
+Clip 4 · The lobby · about 5 pm · 0:39–0:53
+t
+PIC
+LINE
+0:39
+Medium shot: Browning comes in from the street and reaches into his pigeonhole for a small card. NAME CARD: WILLIAM BROWNING · the Vice President's secretary
+
+0:44
+MCU Browning turns the card over.
+CLERK (off): "A gentleman left it. The actor."
+0:48
+MCU Browning.
+BROWNING (face): "I've met him. In Nashville."
+Clip 5 · Same lobby · 0:53–1:08
+t
+PIC
+LINE
+0:53
+CU Browning, reading quietly aloud, puzzled. The card stays out of focus in the foreground.
+BROWNING (face): "'Don't wish to disturb you. Are you at home? J. Wilkes Booth.'" REAL WORDS · 1865
+0:59
+MCU Browning looks up the staircase toward the upper floors. The pocket-watch tick starts.
+
+1:01
+Insert: the card goes back into the pigeonhole. TRUE card: "THE CARD IS IN THE NATIONAL ARCHIVES. NO ONE KNOWS WHO IT WAS FOR, OR WHY." Stamp thump. Freeze. White flash.
+
+1:08
+END
+
+Beat check:
+
+Target
+Ep 4
+Runtime
+60–90 s
+1:08
+Clips
+4–6 of 10–15 s
+5 (13 · 14 · 12 · 14 · 15)
+Hook in 3 s
+yes
+0:00, "Is the Vice President in?"
+Conflict, secret and lie
+yes
+Booth pumps the clerk and hides his purpose. Atzerodt hides in the same hotel. Browning holds a riddle.
+Speaking cast
+small
+3, plus Atzerodt silent
+Cliff
+real words, then a real fact
+the card's text, REAL WORDS (a surviving artifact), then a TRUE card
+Text on props
+none needed
+The card is out of focus, and its words come in voice.
+Where ep 5 opens: about 4 pm on Pennsylvania Avenue. Booth hands a sealed letter to the actor John Matthews as Grant's carriage rolls toward the station.
+
+EP 5: "Ten Fifteen" (early-wall candidate)
+Runtime: 1:14 · 5 clips · 2 places (L11 avenue, L12 Herndon House room) · 1 time jump (4 pm to 8 pm, between clips 2 and 3) · speaking cast: Booth, Powell, Atzerodt. Matthews, Julia and Ulysses Grant, and Herold are silent.
+Why this is the wall: every episode so far gave one piece: the motive, the box, the guns, the card. Ep 5 puts them together. The general rides out of the story, and the plan is spoken aloud: three men, three targets, one hour, and one target can't get out of bed. The cliff is the documented plan, and it is a threat, not a letter. All of the violence stays behind the wall.
+Hook (0:00–0:03): Booth hands a sealed letter to a friend and tells him to make it public tomorrow.
+Super, 0:00–0:01: corner bug "LINCOLN: THE CONSPIRACY · 5", plus small type: "APRIL 14 · 4 PM".
+Clip 1 · Pennsylvania Avenue · about 4 pm · 0:00–0:13
+t
+PIC
+LINE
+0:00
+MCU Booth on a bay mare at the curb, leaning down to hold out a sealed envelope. The envelope is blank and edge-on.
+BOOTH (face): "Take this to the Intelligencer. Tomorrow."
+0:04
+MCU Matthews on the plank sidewalk takes it and turns it over, uneasy. NAME CARD: JOHN MATTHEWS · actor, Booth's friend
+
+0:07
+Over Matthews's shoulder, looking up the avenue: an open carriage with a cavalry escort comes toward them. Matthews lifts his chin toward it.
+
+0:10
+MCU Booth turns in the saddle and watches it come. The pocket-watch tick starts.
+
+Clip 2 · Pennsylvania Avenue, alongside the carriage · moments later · 0:13–0:26
+t
+PIC
+LINE
+0:13
+Tracking medium shot: Booth walks his mare up beside the open carriage and leans to look in.
+
+0:16
+MCU Julia Grant, three-quarter view, meets his stare and draws back. NAME CARD: JULIA GRANT · the General's wife · 39
+
+0:19
+MCU Grant beside her, eyes front, a cigar unlit. Booth's horse drops back out of frame. Overlay super, lower third, 3 s: "JULIA GRANT LATER WROTE OF A DARK RIDER WHO STARED INTO THEIR CARRIAGE."
+
+0:23
+28mm wide: the carriage rolls away toward the station, and Booth sits his horse in the street. Overlay super, 2 s: "THE GRANTS LEFT ON THE EVENING TRAIN."
+
+Clip 3 · A rented room, Herndon House · 8 pm · 0:26–0:40
+t
+PIC
+LINE
+0:26
+Super, 1 s: "8 PM". 28mm wide, candlelight: a map on the bed. Powell is at the window, a nervous small man (Atzerodt) by the door, and a boy with a pocket watch (Herold). NAME CARD: DAVID HEROLD · druggist's clerk · 22
+
+0:29
+MCU Booth looks at each of them in turn.
+BOOTH (face): "Tonight. All at once."
+0:32
+MCU Booth turns to Powell.
+BOOTH (face): "Lewis. The Secretary of State."
+0:35
+MCU Powell, flat.
+POWELL (face): "Seward? In his house?"
+0:37
+MCU Booth.
+BOOTH (face): "In his bed. He can't move."
+Clip 4 · Same room · 0:40–0:54
+t
+PIC
+LINE
+0:40
+MCU Booth turns to the door.
+BOOTH (face): "George. The Vice President."
+0:43
+MCU Atzerodt, his back to the door, shaking his head.
+ATZERODT (face): "I won't kill anybody." REPORTED · ATZERODT'S STATEMENT · 1865
+0:47
+Medium shot: Booth crosses the room and pins him to the door by the collar. The candle flame leans.
+BOOTH (face): "You're in it now."
+0:51
+CU Atzerodt, white.
+
+Clip 5 · Same room · 0:54–1:14
+t
+PIC
+LINE
+0:54
+Insert: the brass Derringer, one ball pressed home.
+POWELL (off): "And the President?"
+0:58
+MCU Booth snaps it shut.
+BOOTH (face): "Mine. Ford's Theatre."
+1:01
+Insert: Herold's open pocket watch. The hands are unreadable in the candlelight, and the tick is loud.
+BOOTH (off): "Ten fifteen."
+1:04
+28mm wide: four men around a candle, no one moving. Push in on Booth. TRUE card: "THE PRESIDENT. THE VICE PRESIDENT. THE SECRETARY OF STATE, IN HIS SICKBED. ALL SET FOR ABOUT 10:15." Stamp thump. Freeze. White flash. Hard theatre-drum hit.
+
+1:14
+END
+
+Beat check:
+
+Target
+Ep 5
+Runtime
+60–90 s
+1:14
+Clips
+4–6 of 10–15 s
+5 (13 · 13 · 14 · 14 · 20). Clip 5 includes the 10 s freeze and card.
+Hook in 3 s
+yes
+0:00, "Take this to the Intelligencer. Tomorrow."
+Conflict
+2+ characters
+Atzerodt refuses, and Booth forces him. Powell is handed a helpless target.
+Speaking cast
+small
+3
+Cliff
+real fact
+TRUE card: the documented three-target plan and the time. Nothing written comes after it.
+"Three, not four"
+Grant left town
+Shown: Grant leaves in clip 2, and the plan has three names.
+Payoff spent
+none
+No shot, no knife, no blood.
+Strongest cliff of eps 1–5
+yes
+It turns the season's premise from a promise into a timetable, with a named, bedridden victim.
+Where ep 6 opens: a step back to 3 pm that afternoon. Lincoln and Mary in an open carriage, and he is happier than she has seen him in years.
+
+4. What's real, compressed and dramatized (per episode)
+Ep 1: The Last Speech
+Documented:
+	•	Lincoln's last public address, on April 11, 1865, from the window above the north portico, at night, in drizzle, to a crowd celebrating Lee's surrender.
+	•	Both of Lincoln's lines are quoted exactly from the address (Collected Works, ed. Basler). The super "HE MEANS THE VOTE. FOR SOME BLACK MEN." is our gloss of "the elective franchise … given to the colored man".
+	•	A companion held the candle and Tad gathered the dropped pages (Noah Brooks's account).
+	•	Booth was in the crowd.
+Reported:
+	•	Booth urging Powell to shoot Lincoln there, Powell refusing, "That means … citizenship" and "That is the last speech he will ever make" are all third-hand: Thomas Eckert, testifying in 1867 to what Powell told him while a prisoner. The tag on screen says THIRD-HAND.
+	•	"That means … citizenship" is shortened. The reported line has a racial slur before "citizenship". We cut it, mark the cut with an ellipsis on screen, and disclose it here. The meaning is unchanged.
+Dramatized:
+	•	Every Booth–Powell exchange in clips 1 and 3. Their substance (Booth wants the shot, Powell refuses) follows Eckert, and the wording is ours.
+	•	Herold, who some accounts place there too, is left out to keep the cast small.
+The cliff card:
+	•	"Three days later, he picked three targets" compresses when the plan formed. The three-target plan for April 14 is documented (trial, Atzerodt).
+	•	When Booth turned kidnap into murder that week is debated. The card claims the plan, not the moment he decided.
+Ep 2: The Box
+Documented:
+	•	On the morning of April 14, the White House reserved the state box at Ford's for the President's party.
+	•	Grant attended the cabinet meeting that morning and declined the theatre, leaving with Julia that evening to see their children in Burlington, New Jersey.
+	•	Booth had his mail sent to Ford's and learned around noon that the President was coming.
+	•	Lincoln saw Booth in The Marble Heart at Ford's on November 9, 1863.
+Accounts say:
+	•	That it was Harry Ford who told Booth.
+	•	That the invitation to Grant was made in person at the meeting.
+Dramatized:
+	•	All dialogue. Grant's reason is his documented one, put in our words. Lincoln's "The people want to see you" is ours.
+	•	That Mary Lincoln had snubbed Julia Grant weeks earlier, at City Point, is often given as the real reason. It is left out of the episode because the accounts are secondhand.
+	•	The empty auditorium and Booth looking up at the box are staged. The flags on the box are not shown, because they were hung later that afternoon.
+Ep 3: Shooting Irons
+Documented (trial record, Pitman 1865):
+	•	Booth called at the Surratt boarding house in the afternoon and left a parcel with Mary Surratt. Lloyd testified that it held Booth's field glasses.
+	•	Louis Weichmann drove her to Surrattsville in a hired buggy. Her stated business was a debt owed to her (John Nothey).
+	•	Lloyd arrived at the tavern around 5 pm, having been drinking.
+	•	Two carbines had been hidden at the tavern weeks earlier.
+Reported:
+	•	Her words to Lloyd come only from Lloyd's testimony, which gives them in indirect speech. We render them as direct speech and tag them REPORTED.
+	•	Lloyd is a contested witness. He was drinking that day, and he testified under threat of prosecution. Defenders of Mary Surratt dispute his account. Her guilt is argued to this day, and the series says so in ep 25.
+Dramatized:
+	•	Every untagged line, including "Something breakable", "Drive, Mr. Weichmann" and "For who?".
+	•	Booth's instruction "Only Lloyd": the parcel's delivery to Lloyd is documented, and Booth's wording is ours.
+Ep 4: The Card
+Documented:
+	•	The card's text: "Don't wish to disturb you. Are you at home? J. Wilkes Booth." It survives at the National Archives.
+	•	Booth left it at the Kirkwood House desk on the afternoon of April 14, and it was placed in the box of Johnson's private secretary, William A. Browning.
+	•	Browning testified that he found it on returning and that he knew Booth.
+	•	Atzerodt registered at the Kirkwood House that morning.
+Open, and kept open:
+	•	Whether Booth meant the card for Johnson or for Browning, and why he left it.
+	•	The episode asks the question and doesn't answer it.
+Dramatized:
+	•	The clerk's lines and Booth's questions at the desk, though the clerk's testimony supports that Booth asked who was in.
+	•	Booth murmuring the card's words as he writes. The words are the card's, and the murmuring is ours.
+	•	"I've met him. In Nashville." paraphrases Browning's testimony.
+	•	Atzerodt's scene: his room is documented, and the footsteps and the drink are staged. Nothing implies he knew the plan yet. By his own account, he learned of the killing at the 8 pm meeting (ep 5).
+Ep 5: Ten Fifteen
+Documented:
+	•	On the afternoon of April 14, Booth gave his fellow actor John Matthews a sealed letter for the National Intelligencer. Matthews later said he read it and burned it after the assassination.
+	•	Grant and Julia left Washington by the evening train.
+	•	The 8 pm meeting at the Herndon House and the three-target plan: Booth would take Lincoln, Powell Seward and Atzerodt Johnson, at about 10:15. This rests on Atzerodt's statements and trial testimony.
+	•	Seward was bedridden after his carriage accident of April 5.
+	•	Booth carried a single-shot Derringer.
+Reported:
+	•	The rider at the carriage is Julia Grant's later recollection (her memoirs). She did not identify him at the time, and the link to Booth is hers, made afterwards. The super quotes no words, only that she wrote of it.
+	•	That Grant's carriage passed while Booth was with Matthews comes from Matthews's later account.
+	•	"I won't kill anybody" is the substance of Atzerodt's own statements, in which he says he refused. It is self-serving, from a man trying to save his neck, and it is tagged REPORTED.
+Dramatized:
+	•	All untagged lines.
+	•	Booth pinning Atzerodt to the door. Atzerodt said Booth threatened him, and the physical action is ours.
+	•	Who stood where in the room, and Herold's watch.
+	•	Whether all four were in the room together at 8 pm is itself an "accounts say" (see §5).
+
+Cast (name cards, and why they look like this)
+Character
+Name card
+Why they look like this
+John Wilkes Booth
+JOHN WILKES BOOTH · America's matinee idol · 26
+Widely called the handsomest man in America. Jet-black curly hair, a black mustache, pale skin, dark eyes; about 5'8", an athlete famous for leaping onto the stage. Dressed like a star. (His brother Edwin was the more famous tragedian; John was the matinee idol.) Casting: magnetic, never a heartthrob. He is a racist murderer who happened to be handsome.
+Abraham Lincoln
+ABRAHAM LINCOLN · President · 56
+His own 1859 sketch: "six feet, four inches, nearly; lean in flesh… dark complexion, with coarse black hair, and grey eyes." By April 1865 he is gaunt, deeply lined and hollow-cheeked, with a chin beard and no mustache. VOICE (locked casting note): witnesses describe it as high-pitched, thin and reedy, a tenor that carried, with a Kentucky accent. Never the deep movie baritone. It's also a share fact.
+Lewis Powell
+LEWIS POWELL · Confederate veteran · 20
+About 6'2", powerfully built and strikingly handsome, with a heavy jaw, thick dark hair and a flat, unblinking stare. His 1865 Gardner photos went viral in our time. Quiet, almost mute on screen.
+David Herold
+DAVID HEROLD · druggist's clerk · 22
+Boyish, slight, eager. Booth's errand boy. He knew the back roads of Maryland.
+George Atzerodt
+GEORGE ATZERODT · carriage painter · 29
+Small, stooped and scruffy, with a German accent (born in Prussia). The weak link.
+William Seward
+WILLIAM SEWARD · Secretary of State · 63
+Hawk-nosed, frail, in bed in a metal-and-leather brace after the carriage crash.
+Mary Surratt
+MARY SURRATT · boarding-house owner · 42
+A widow in black who ran the H Street boarding house where the plotters met. Contemporary descriptions give a stout, upright, dark-haired woman with grey eyes; she was devout. Only a few photographs are attributed to her, and their attribution is debated, so her face is the one we design rather than match. The series page says so.
+Henry Rathbone and Clara Harris
+the guests in the box
+An engaged couple in their twenties, in evening dress.
+The true story: facts and sources (background)
+The 10 facts that make people say "holy shit"
+#
+Fact
+Source
+Confidence
+1
+Three targets, one time. Booth would take Lincoln, Powell would take Secretary of State Seward, and Atzerodt would take Vice President Johnson, all at about 10:15 pm.
+Conspirators' trial (Pitman 1865); Atzerodt's statements
+High
+2
+A neck and jaw brace may have saved Seward. He was in bed after a carriage crash on April 5, wearing a metal-and-leather brace. Powell's knife slashed his face and neck but was hindered by it.
+Seward family accounts; Ford's Theatre / HistoryNet
+Medium-high. Sources describe the device differently, and some say he also rolled off the bed.
+3
+The Vice President's assassin got drunk instead. Atzerodt took a room at Johnson's hotel, drank at the bar and never knocked.
+Atzerodt's confession; trial testimony
+High
+4
+Booth left a calling card at the Vice President's hotel that afternoon: "Don't wish to disturb you. Are you at home? J. Wilkes Booth." It ended up in the box of Johnson's secretary, William A. Browning. Whether it was meant for Johnson or for Browning, and why, historians still argue.
+National Archives (the card survives)
+High (the card); open (the recipient and the motive)
+5
+Booth's brother had saved Lincoln's son. Edwin Booth pulled Robert Todd Lincoln off the tracks at the Jersey City station, months before the murder.
+Robert Lincoln's 1909 letter to Century Magazine
+High that it happened. The date is uncertain, 1863–65 (often given as Aug 1864).
+6
+It started as a kidnapping. On March 17, 1865, the gang waited on a road to grab Lincoln's carriage. He changed his plans.
+Trial testimony; Kauffman
+High
+7
+The trigger was a speech. On April 11, Lincoln publicly backed voting rights for some Black men. Booth, in the crowd, reportedly said it would be "the last speech he will ever make."
+Lincoln's last public address (Collected Works); Booth's words are third-hand: Thomas Eckert, reporting what Powell told him
+High (the speech); medium (Booth's words)
+8
+Booth waited for the biggest laugh in the play ("you sockdologizing old man-trap") so the shot would be covered by the laughter.
+Our American Cousin script; Kauffman, Alford
+High (the line); medium-high (the intent)
+9
+Powell walked into a trap. Three nights later he knocked on Mary Surratt's door with a pickaxe, claiming he'd come to dig a gutter, while detectives were inside arresting her. She said: "Before God, sir, I do not know this man."
+Trial testimony
+High
+10
+The one who got away. John Surratt fled to Canada and then Rome, enlisted in the Pope's army, jumped off a cliff to escape arrest, and was caught in Egypt. His 1867 jury deadlocked, and he lived free until 1916. His mother, Mary, was hanged in 1865, the first woman executed by the federal government.
+Surratt trial 1867; Larson
+High
+Extra facts for later episodes:
+	•	Henry Rathbone, the major in the box whom Booth stabbed, later killed his wife Clara Harris (who had been with him in the box) in 1883 and died in an asylum. High.
+	•	Booth's last words in the burning barn were "Useless, useless." High.
+	•	The man who shot Booth, Boston Corbett, fired against orders. Years earlier he had castrated himself. High.
+	•	Lincoln had seen Booth act at Ford's in The Marble Heart, November 1863. High.
+	•	"Now he belongs to the ages." Stanton may have said "angels" instead. Flag: disputed.
+The sources
+Primary:
+	•	Benn Pitman, The Assassination of President Lincoln and the Trial of the Conspirators (1865), the official trial record
+	•	Lincoln's last public address, April 11, 1865, in Collected Works, ed. Basler
+	•	Booth's calling card, National Archives
+	•	Booth's diary, Ford's Theatre NHS
+	•	Atzerodt's statement (the Doster papers)
+	•	Robert Todd Lincoln's letter in Century Magazine, 1909
+	•	Testimony from the 1867 trial of John Surratt
+Histories:
+	•	James L. Swanson, Manhunt: The 12-Day Chase for Lincoln's Killer (2006)
+	•	Michael W. Kauffman, American Brutus (2004)
+	•	Edward Steers Jr., Blood on the Moon (2001)
+	•	Terry Alford, Fortune's Fool: The Life of John Wilkes Booth (2015)
+	•	Kate Clifford Larson, The Assassin's Accomplice: Mary Surratt (2008)
+	•	William Hanchett, The Lincoln Murder Conspiracies (1983)
