@@ -1,0 +1,78 @@
+# Rates checked against fal model pages on 2026-11-23.
+# unit "usage" means the real cost depends on tokens or inputs: log an estimate.
+endpoints:
+  # Character and key images
+  google/nano-banana-2.1/edit:
+    unit: usage
+  openai/gpt-image-2.6/sunburst/edit:
+    unit: usage
+  bytedance/seedream/v5.5/edit:
+    unit: usage # per output plus a fee per input image
+  blackforestlabs/flux-3/edit-image:
+    unit: usage # megapixel rules not published on the model page
+
+  # Video
+  alibaba/wan-3.0/image-to-video:
+    unit: seconds
+    tier_key: resolution
+    rates: { "480p": 0.05, "720p": 0.10, "1080p": 0.20 }
+  alibaba/wan-3.0/reference-to-video:
+    unit: usage # reference video seconds are billed on top
+  fal-ai/kling-video/v3/pro/image-to-video:
+    unit: seconds
+    tier_key: generate_audio # voice control ($0.196/s) is not used
+    rates: { "false": 0.112, "true": 0.168 }
+  minimax/h3-max/image-to-video:
+    unit: seconds
+    tier_key: resolution
+    rates: { "480P": 0.05, "768P": 0.08, "1080P": 0.16 }
+    padding_seconds: 0.7 # output can run up to 0.7 s past the request
+  minimax/h3-max/reference-to-video:
+    unit: usage # reference tokens can be billed on top
+
+  # Lip-sync (pass quantity in minutes)
+  fal-ai/sync-lipsync/v3:
+    unit: minutes
+    rate: 8.0
+
+  # Voice
+  fal-ai/minimax/voice-design:
+    unit: cloned voices
+    rate: 3.015 # $3 per voice plus the longest allowed 500-character preview
+  fal-ai/minimax/speech-2.8-hd:
+    unit: 1000 characters
+    rate: 0.10
+  fal-ai/qwen-3-tts/voice-design/1.7b:
+    unit: 1000 characters
+    rate: 0.09
+  fal-ai/qwen-3-tts/text-to-speech/1.7b:
+    unit: 1000 characters
+    rate: 0.09
+  elevenlabs/tts/eleven-v4:
+    unit: 1000 characters
+    rate: 0.08
+  fal-ai/elevenlabs/tts/eleven-v3:
+    unit: 1000 characters
+    rate: 0.10
+  fal-ai/elevenlabs/voice-changer:
+    unit: minutes
+    rate: 0.30
+  fal-ai/elevenlabs/speech-to-text/scribe-v2:
+    unit: minutes # keyterm use costs 30% more and is not used
+    rate: 0.008
+
+  # Music, effects and finishing
+  elevenlabs/music/v2.5:
+    unit: minutes
+    rate: 0.60
+    round_up: true
+  elevenlabs/sound-effects/v3:
+    unit: seconds
+    rate: 0.002
+  fal-ai/seedvr/upscale/video:
+    unit: megapixels # width x height x frames / 1,000,000
+    rate: 0.001
+
+  # Image judge candidate
+  openrouter/router/vision:
+    unit: usage
