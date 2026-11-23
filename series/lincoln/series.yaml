@@ -1,0 +1,29 @@
+title: "Lincoln: The Conspiracy"
+episodes: 30
+true_story: true
+source_format: table_script
+paywalls:
+  5: early
+  11: late
+held_back:
+  "the shot": 12
+  "the knife": 12
+  "Lincoln's death": 14
+knowledge_rules:
+  - who: Atzerodt
+    topic: the killing plan
+    not_before: 5
+tone: >-
+  Everyone knows how the night ends. The drama is the road to it: the people,
+  the near misses, and the things almost nobody knows. Show violence with
+  restraint and never make it glamorous. Treat the racism at the heart of
+  Booth's motive plainly and without softening it.
+story_notes:
+  - Booth is magnetic but never admired. He is a racist murderer.
+  - Atzerodt moves from frightened recruit, to the man who never knocks, to the weak link.
+  - Episodes 1 to 5 each give one piece of the plan and spend none of the payoff.
+  - Important setups include the calling card, the field glasses, the carbines, the empty guard chair and Grant's refusal.
+  - The pocket-watch tick is a recurring motif.
+  - By his own account, Atzerodt learned the plan was murder at the 8 pm meeting in episode 5.
+  - The parcel Mary Surratt carried held field glasses. The carbines were hidden at the tavern weeks earlier. Never imply the parcel held guns.
+  - Keep these open - who the card was for, Mary Surratt's guilt, and when kidnapping became murder.

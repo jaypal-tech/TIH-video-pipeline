@@ -18,6 +18,16 @@ def _duration_seconds(arguments: dict[str, Any]) -> float | None:
     return float(match.group(1)) if match else None
 
 
+def token_cost(
+    models_file: Path, model: str, input_tokens: int, output_tokens: int
+) -> float:
+    """Return the USD cost of a Claude call from its rates in models.yaml."""
+    models = yaml.safe_load(Path(models_file).read_text(encoding="utf-8"))["endpoints"]
+    entry = models[model]
+    cost = input_tokens * entry["input_per_mtok"] + output_tokens * entry["output_per_mtok"]
+    return round(cost / 1_000_000, 6)
+
+
 def read_cost(
     models_file: Path,
     endpoint: str,

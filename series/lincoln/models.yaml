@@ -76,3 +76,9 @@ endpoints:
   # Image judge candidate
   openrouter/router/vision:
     unit: usage
+
+  # Claude (called directly through Anthropic)
+  claude-opus-5-5:
+    unit: tokens
+    input_per_mtok: 4.0
+    output_per_mtok: 20.0

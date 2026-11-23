@@ -119,7 +119,8 @@ def test_cli_runs_stage(tmp_path):
     counting_run = CountingRun()
     register(Stage("a", requires=(), gate=None, run=counting_run))
     result = CliRunner().invoke(
-        cli.app, ["run", "1", "--stage", "a", "--root", str(tmp_path)]
+        cli.app,
+        ["run", "1", "--stage", "a", "--series", "demo", "--root", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     assert "ran" in result.output
