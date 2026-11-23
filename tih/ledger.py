@@ -6,8 +6,10 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
+from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, Field
 
+SECRET_NAMES = ("FAL_KEY", "ANTHROPIC_API_KEY", "CLAUDE_API_KEY")
 JSON_COLUMNS = {"settings", "inputs", "input_hashes"}
 REUSABLE_STATUSES = {"submitted", "ok"}
 
@@ -57,13 +59,22 @@ def fingerprint(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _redact(value: Any, secret: str) -> Any:
+def _secrets() -> list[str]:
+    file_values = dotenv_values(Path.cwd() / ".env")
+    values = {os.environ.get(name) for name in SECRET_NAMES}
+    values |= {file_values.get(name) for name in SECRET_NAMES}
+    return sorted((value for value in values if value), key=len, reverse=True)
+
+
+def _redact(value: Any, secrets: list[str]) -> Any:
     if isinstance(value, str):
-        return value.replace(secret, "[REDACTED]")
+        for secret in secrets:
+            value = value.replace(secret, "[REDACTED]")
+        return value
     if isinstance(value, dict):
-        return {_redact(k, secret): _redact(v, secret) for k, v in value.items()}
+        return {_redact(k, secrets): _redact(v, secrets) for k, v in value.items()}
     if isinstance(value, list):
-        return [_redact(item, secret) for item in value]
+        return [_redact(item, secrets) for item in value]
     return value
 
 
@@ -136,8 +147,7 @@ class Ledger:
         return events
 
     def _write(self, event: dict[str, Any]) -> None:
-        secret = os.environ.get("FAL_KEY")
-        safe = _redact(event, secret) if secret else event
+        safe = _redact(event, _secrets())
         line = json.dumps(safe, ensure_ascii=False).encode("utf-8") + b"\n"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a+b") as handle:

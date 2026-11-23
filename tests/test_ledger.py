@@ -89,6 +89,24 @@ def test_update_and_nested_settings_never_contain_key(tmp_path, monkeypatch):
     assert "secret-123" not in path.read_text()
 
 
+@pytest.mark.parametrize("name", ["FAL_KEY", "ANTHROPIC_API_KEY", "CLAUDE_API_KEY"])
+def test_every_provider_key_is_redacted(tmp_path, monkeypatch, name):
+    monkeypatch.setenv(name, "secret-456")
+    path = tmp_path / "c.jsonl"
+    Ledger(path).append(rec("c1", prompt="x secret-456 y"))
+    assert "secret-456" not in path.read_text()
+
+
+def test_key_only_in_dotenv_file_is_redacted(tmp_path, monkeypatch):
+    for name in ("FAL_KEY", "ANTHROPIC_API_KEY", "CLAUDE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("CLAUDE_API_KEY=secret-789 # my note\n")
+    path = tmp_path / "c.jsonl"
+    Ledger(path).append(rec("c1", prompt="x secret-789 y"))
+    assert "secret-789" not in path.read_text()
+
+
 def test_torn_final_line_is_ignored_and_next_write_is_clean(tmp_path):
     path = tmp_path / "calls.jsonl"
     ledger = Ledger(path)
