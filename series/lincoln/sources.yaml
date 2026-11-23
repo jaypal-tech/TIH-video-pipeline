@@ -1,0 +1,60 @@
+# Citations come only from the producer brief. Text keys must match the script exactly.
+sources:
+  pitman_1865: "Benn Pitman, The Assassination of President Lincoln and the Trial of the Conspirators (1865)"
+  basler_last_address: "Lincoln's last public address, April 11, 1865, in Collected Works, ed. Basler"
+  nara_booth_card: "Booth's calling card, National Archives"
+  atzerodt_statement: "Atzerodt's statement (the Doster papers)"
+  eckert_1867: "Thomas Eckert, testifying in 1867 to what Powell told him (third-hand)"
+  brief_extra_facts: "Producer brief, extra facts list, rated High, no citation given"
+
+claims:
+  # REAL WORDS
+  "We meet this evening, not in sorrow, but in gladness of heart.":
+    source_id: basler_last_address
+    confidence: high
+  "I would myself prefer that it were now conferred on the very intelligent,":
+    source_id: basler_last_address
+    confidence: high
+  "and on those who serve our cause as soldiers.":
+    source_id: basler_last_address
+    confidence: high
+  "Don't wish to disturb you. Are you at home?":
+    source_id: nara_booth_card
+    confidence: high
+  "'Don't wish to disturb you. Are you at home? J. Wilkes Booth.'":
+    source_id: nara_booth_card
+    confidence: high
+
+  # REPORTED
+  "That means … citizenship.":
+    source_id: eckert_1867
+    confidence: medium, third-hand, shortened with a disclosed cut
+  "That is the last speech he will ever make.":
+    source_id: eckert_1867
+    confidence: medium, third-hand
+  "Have those shooting irons ready tonight.":
+    source_id: pitman_1865
+    confidence: contested witness, indirect speech rendered as direct
+  "There will be parties to call for them.":
+    source_id: pitman_1865
+    confidence: contested witness, indirect speech rendered as direct
+  "I won't kill anybody.":
+    source_id: atzerodt_statement
+    confidence: self-serving statement, substance only
+
+  # TRUE cards
+  "THREE DAYS LATER, HE PICKED THREE TARGETS. ONE NIGHT. ONE HOUR.":
+    source_id: pitman_1865
+    confidence: high for the plan, the moment he decided is debated
+  "LINCOLN HAD WATCHED BOOTH ACT ON THIS STAGE. NOVEMBER 1863.":
+    source_id: brief_extra_facts
+    confidence: high, citation still needed
+  "TWO CARBINES WERE HIDDEN IN THIS TAVERN.":
+    source_id: pitman_1865
+    confidence: documented
+  "THE CARD IS IN THE NATIONAL ARCHIVES. NO ONE KNOWS WHO IT WAS FOR, OR WHY.":
+    source_id: nara_booth_card
+    confidence: high for the card, recipient and motive are open
+  "THE PRESIDENT. THE VICE PRESIDENT. THE SECRETARY OF STATE, IN HIS SICKBED. ALL SET FOR ABOUT 10:15.":
+    source_id: pitman_1865
+    confidence: high
