@@ -14,9 +14,19 @@ from tih.providers.pricing import token_cost
 from tih.stages import story_room
 from tih.stages.record import run_record
 from tih.stages.registry import RunContext
-from tih.story.season import SeasonPlan
+from tih.story.critique import (
+    Change,
+    Comparison,
+    EndingLabel,
+    EpisodeCritique,
+    Finding,
+    Revision,
+    SeasonCritique,
+    TruthCritique,
+)
+from tih.story.season import EpisodeBatch, SeasonPlan
 
-from test_season import valid_plan
+from test_season import details_of, spine_of, valid_plan
 
 ROOT = Path(__file__).parents[1]
 MODELS = ROOT / "series" / "lincoln" / "models.yaml"
@@ -47,6 +57,9 @@ class FakeClient:
     def stream(self, **kwargs):
         self.calls.append(kwargs)
         return FakeStream(self.outputs.pop(0))
+
+    def sent(self, index):
+        return self.calls[index]["messages"][0]["content"]
 
 
 def reply(parsed, stop_reason="end_turn", number=1):
@@ -87,6 +100,7 @@ def test_call_is_logged_with_real_token_cost(tmp_path):
     assert record.cost_source == "usage"
     assert record.settings["role"] == "showrunner"
     assert client.calls[0]["output_format"] is SeasonPlan
+    assert client.calls[0]["max_tokens"] == 64000
 
 
 def test_identical_call_is_not_paid_twice(tmp_path):
@@ -138,6 +152,49 @@ def test_api_status_error_is_logged_free(tmp_path):
     assert (record.status, record.cost_usd) == ("error", 0.0)
 
 
+def weak_ending(plan, episode=3):
+    return Finding(
+        check="E5",
+        episode=episode,
+        quote=plan.episodes[episode - 1].cliff,
+        problem="No threat is left hanging.",
+        verdict="no",
+    )
+
+
+def run_replies(draft, revised, batch=10, true_story=True, findings=None, changes=None):
+    """Replies for one full Story Room run, in call order."""
+    details = details_of(draft)
+    replies = [reply(spine_of(draft))]
+    for start in range(0, len(details), batch):
+        replies.append(reply(EpisodeBatch(episodes=details[start : start + batch])))
+    findings = [weak_ending(draft)] if findings is None else findings
+    labels = [EndingLabel(number=e.number, label="opens_question") for e in draft.episodes]
+    replies.append(reply(EpisodeCritique(findings=findings, ending_labels=labels)))
+    replies.append(
+        reply(SeasonCritique(findings=[], top_fixes=["Fix episode 3."], verdict="consider"))
+    )
+    if true_story:
+        replies.append(reply(TruthCritique(findings=[])))
+    if changes is None:
+        changes = [Change(finding="F1", action="fixed", note="New ending.")]
+    replies.append(reply(Revision(changes=changes, plan=revised)))
+    return replies
+
+
+def compare_replies():
+    return [
+        reply(Comparison(why="B is sharper.", better="B")),
+        reply(Comparison(why="A is sharper.", better="A")),
+    ]
+
+
+def revised_plan():
+    plan = valid_plan()
+    plan.episodes[2].cliff = "The stranger says her name, and she runs."
+    return plan
+
+
 @pytest.fixture
 def season(tmp_path, monkeypatch):
     monkeypatch.chdir(ROOT)
@@ -152,37 +209,109 @@ def use_client(monkeypatch, tmp_path, client):
     return llm
 
 
-def test_story_room_writes_season_files(season, tmp_path, monkeypatch):
-    use_client(monkeypatch, tmp_path, FakeClient(reply(valid_plan())))
+def read(season, name):
+    return (season.paths.stage_dir("story_room") / name).read_text("utf-8")
+
+
+def test_story_room_runs_every_step_and_writes_files(season, tmp_path, monkeypatch):
+    client = FakeClient(*run_replies(valid_plan(), revised_plan()), *compare_replies())
+    llm = use_client(monkeypatch, tmp_path, client)
     story_room.run_story_room(season)
-    stage = season.paths.stage_dir("story_room")
-    assert "The Shot and the Knife" in (stage / "season_plan.md").read_text("utf-8")
-    assert len(yaml.safe_load((stage / "season_plan.yaml").read_text("utf-8"))["episodes"]) == 30
-    ledger = yaml.safe_load((stage / "season_ledger.yaml").read_text("utf-8"))
-    assert ledger["setups"][0]["id"] == "card"
-    bible = yaml.safe_load((stage / "bible.yaml").read_text("utf-8"))
-    assert bible["open_questions"] == ["Who was the card for?"]
+
+    roles = [r.settings["role"] for r in llm.ledger.current()]
+    assert roles == [
+        "showrunner_spine",
+        "showrunner_episodes",
+        "showrunner_episodes",
+        "showrunner_episodes",
+        "critic_episodes",
+        "critic_season",
+        "critic_truth",
+        "showrunner_revise",
+        "compare",
+        "compare",
+    ]
+    final = yaml.safe_load(read(season, "season_plan.yaml"))
+    draft = yaml.safe_load(read(season, "draft_plan.yaml"))
+    assert final["episodes"][2]["cliff"] == "The stranger says her name, and she runs."
+    assert draft["episodes"][2]["cliff"] == valid_plan().episodes[2].cliff
+    assert "The Shot and the Knife" in read(season, "season_plan.md")
+    assert "## Unresolved" not in read(season, "season_plan.md")
+    assert yaml.safe_load(read(season, "season_ledger.yaml"))["setups"][0]["id"] == "card"
+    assert yaml.safe_load(read(season, "bible.yaml"))["open_questions"] == [
+        "Who was the card for?"
+    ]
+    assert yaml.safe_load(read(season, "risks.yaml")) == ["Confirm the names before use."]
+    assert "Blind comparison: **revision**" in read(season, "critique.md")
+    assert "F1" in read(season, "changes.md") and "New ending." in read(season, "changes.md")
 
 
-def test_story_room_sends_problems_back_once(season, tmp_path, monkeypatch):
-    broken = valid_plan()
-    broken.episodes[9].reveals = ["the shot"]
-    client = FakeClient(reply(broken), reply(valid_plan(), number=2))
+def test_each_step_sees_the_work_before_it(season, tmp_path, monkeypatch):
+    client = FakeClient(*run_replies(valid_plan(), revised_plan()), *compare_replies())
     use_client(monkeypatch, tmp_path, client)
     story_room.run_story_room(season)
-    assert len(client.calls) == 2
-    assert "held_back_early" in client.calls[1]["messages"][0]["content"]
+
+    assert "Write episodes 11 to 20." in client.sent(2)
+    assert "<season_spine>" in client.sent(2)
+    assert "A hand closes on a letter in episode 10." in client.sent(2)
+    assert "E1: The hook is a moment" in client.sent(4)
+    assert "<source>" not in client.sent(4)
+    assert "T1: Nothing stated" in client.sent(6) and "<source>" in client.sent(6)
+    assert "F1" in client.sent(7) and "No threat is left hanging." in client.sent(7)
+    assert "<plan_a>" in client.sent(8) and "<plan_b>" in client.sent(8)
 
 
-def test_story_room_stops_after_second_failure(season, tmp_path, monkeypatch):
-    broken = valid_plan()
+def test_declined_hard_finding_is_shown_as_unresolved(season, tmp_path, monkeypatch):
+    changes = [Change(finding="F1", action="declined", note="The ending works.")]
+    client = FakeClient(
+        *run_replies(valid_plan(), valid_plan(), changes=changes), *compare_replies()
+    )
+    use_client(monkeypatch, tmp_path, client)
+    story_room.run_story_room(season)
+    page = read(season, "season_plan.md")
+    assert "## Unresolved" in page and "F1 (E5, ep 3)" in page
+
+
+def test_rule_violation_in_draft_reaches_the_showrunner(season, tmp_path, monkeypatch):
+    draft = valid_plan()
+    draft.episodes[9].reveals = ["the shot"]
+    client = FakeClient(
+        *run_replies(draft, revised_plan(), findings=[]), *compare_replies()
+    )
+    use_client(monkeypatch, tmp_path, client)
+    story_room.run_story_room(season)
+    assert "held_back_early" in client.sent(7)
+
+
+def test_broken_revision_gets_one_repair_that_sees_the_plan(season, tmp_path, monkeypatch):
+    broken = revised_plan()
     broken.episodes[9].reveals = ["the shot"]
-    client = FakeClient(reply(broken), reply(broken, number=2))
+    client = FakeClient(
+        *run_replies(valid_plan(), broken), reply(revised_plan()), *compare_replies()
+    )
+    use_client(monkeypatch, tmp_path, client)
+    story_room.run_story_room(season)
+    assert "held_back_early" in client.sent(8)
+    assert "The stranger says her name, and she runs." in client.sent(8)
+    assert yaml.safe_load(read(season, "season_plan.yaml"))["episodes"][9]["reveals"] == []
+
+
+def test_story_room_stops_when_repair_also_fails(season, tmp_path, monkeypatch):
+    broken = revised_plan()
+    broken.episodes[9].reveals = ["the shot"]
+    client = FakeClient(*run_replies(valid_plan(), broken), reply(broken))
     use_client(monkeypatch, tmp_path, client)
     with pytest.raises(story_room.StoryRoomFailed, match="held_back_early"):
         story_room.run_story_room(season)
-    stage = season.paths.stage_dir("story_room")
-    assert not (stage / "season_plan.md").exists()
+    assert not (season.paths.stage_dir("story_room") / "season_plan.md").exists()
+
+
+def test_batch_with_wrong_episodes_stops_the_stage(season, tmp_path, monkeypatch):
+    replies = run_replies(valid_plan(), revised_plan())
+    replies[2] = replies[1]
+    use_client(monkeypatch, tmp_path, FakeClient(*replies))
+    with pytest.raises(story_room.StoryRoomFailed, match="11"):
+        story_room.run_story_room(season)
 
 
 def test_any_series_runs_from_its_own_folder(tmp_path, monkeypatch):
@@ -191,6 +320,7 @@ def test_any_series_runs_from_its_own_folder(tmp_path, monkeypatch):
     (series / "series.yaml").write_text(
         "title: Harbor Lights\nepisodes: 2\nsource_format: freeform\n"
         "tone: Quiet dread.\nstory_notes: [The keeper hides a letter.]\n"
+        "ending_convention: End on the lamp going dark.\n"
     )
     (series / "source" / "brief.txt").write_text("A lighthouse keeper hides a letter.")
     (series / "models.yaml").write_text(MODELS.read_text("utf-8"))
@@ -202,10 +332,13 @@ def test_any_series_runs_from_its_own_folder(tmp_path, monkeypatch):
     plan.episodes = plan.episodes[:2]
     for episode in plan.episodes:
         episode.wall = "none"
-        episode.reveals = []
+        episode.title = f"Working title {episode.number}"
     plan.held_back = []
     plan.knowledge = []
-    client = FakeClient(reply(plan))
+    client = FakeClient(
+        *run_replies(plan, plan, true_story=False, findings=[], changes=[]),
+        *compare_replies(),
+    )
     ledger = Ledger(tmp_path / "runs" / "harbor" / "calls.jsonl")
     llm = LlmContext(ctx.paths, ledger, BudgetGuard(ledger), client, series / "models.yaml")
     monkeypatch.setattr(story_room.LlmContext, "for_run", lambda paths: llm)
@@ -213,8 +346,11 @@ def test_any_series_runs_from_its_own_folder(tmp_path, monkeypatch):
 
     page = (ctx.paths.stage_dir("story_room") / "season_plan.md").read_text("utf-8")
     assert page.startswith("# Harbor Lights, season plan")
-    sent = client.calls[0]["messages"][0]["content"]
-    assert "The keeper hides a letter." in sent and "Quiet dread." in sent
+    assert "Working title 2" in page
+    assert len(client.calls) == 7
+    assert "critic_truth" not in [r.settings["role"] for r in ledger.current()]
+    for text in ("The keeper hides a letter.", "Quiet dread.", "End on the lamp going dark."):
+        assert text in client.sent(0)
 
 
 @pytest.mark.parametrize("name", ["lincoln", "booth", "atzerodt", "seward", "surratt"])

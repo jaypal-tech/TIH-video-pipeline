@@ -18,7 +18,7 @@ from tih.providers.pricing import token_cost
 
 MODEL = "claude-opus-5-5"
 EFFORT = "high"
-MAX_TOKENS = 32000
+MAX_TOKENS = 64000
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 

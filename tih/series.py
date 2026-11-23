@@ -22,6 +22,8 @@ class SeriesConfig(BaseModel):
     knowledge_rules: list[KnowledgeRule] = Field(default_factory=list)
     tone: str = ""
     story_notes: list[str] = Field(default_factory=list)
+    ending_convention: str = ""
+    batch_size: int = 10
     source_format: Literal["table_script", "freeform"] = "freeform"
 
 
