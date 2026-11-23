@@ -1,0 +1,12 @@
+.env
+runs/
+export/
+series/*/assets/
+docs/
+reports/
+research_notes/
+node_modules/
+__pycache__/
+.pytest_cache/
+.venv/
+.superpowers/
