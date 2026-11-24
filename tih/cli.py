@@ -33,10 +33,10 @@ from tih.stages import sound as _sound  # noqa: F401  registers the stage
 from tih.stages import story_room as _story_room  # noqa: F401  registers the stage
 from tih.stages import voice as _voice  # noqa: F401  registers the stage
 from tih.stages import writers_room as _writers_room  # noqa: F401  registers the stage
-from tih.stages.registry import RunContext, run_stage
+from tih.stages.registry import DONE_FILE, RunContext, run_stage
 
 # The order an episode runs in after Script Lock and Look Lock.
-EPISODE_STAGES = ("record", "shotplan", "keyframes", "motion", "voice", "lipsync", "sound", "cut")
+EPISODE_STAGES = ("director", "shotplan", "keyframes", "motion", "voice", "lipsync", "sound", "cut")
 
 app = typer.Typer(no_args_is_help=True)
 lock_app = typer.Typer(no_args_is_help=True, help="Lock a character's look or voice.")
@@ -73,7 +73,7 @@ def run(
 def episode(
     number: int,
     series: str = typer.Option(..., "--series"),
-    start: str = typer.Option("record", "--from", help="First stage to run."),
+    start: str = typer.Option("director", "--from", help="First stage to run."),
     force: bool = typer.Option(False, "--force", help="Re-run stages from --from on."),
     root: Path = typer.Option(Path("runs"), "--root"),
 ) -> None:
@@ -86,9 +86,22 @@ def episode(
         typer.echo(f"{stage}: {result}")
 
 
-def rehearse_episode(number: int, series: str, root: Path) -> RunContext:
-    """Run every stage with placeholder media. Locks and approvals stay inside root."""
+def rehearse_episode(number: int, series: str, root: Path, source: Path = Path("runs")) -> RunContext:
+    """Run every video stage with placeholder media, from the real locked script and shot plan.
+
+    The Writer's script and the Director's plan are copied from `source`; locks and
+    approvals stay inside `root`.
+    """
     paths = RunPaths(series, number, root=root)
+    real = RunPaths(series, number, root=source)
+    for stage in ("writers_room", "director"):
+        if not (real.scope_dir / stage / DONE_FILE).exists():
+            raise FileNotFoundError(
+                f"Run the Writer and Director for episode {number} first: "
+                f"tih run {number} --stage director --series {series}"
+            )
+    for stage in ("writers_room", "director"):
+        shutil.copytree(real.scope_dir / stage, paths.scope_dir / stage, dirs_exist_ok=True)
     os.environ[LOCKS_OVERRIDE] = str(root / series / "locks.yaml")
     ledger = Ledger(root / series / "calls.jsonl")
     gateway = GatewayContext(
@@ -96,9 +109,8 @@ def rehearse_episode(number: int, series: str, root: Path) -> RunContext:
         series_dir(series) / "models.yaml",
     )
     ctx = RunContext(paths=paths, gateway=gateway)
-    run_stage(ctx, "record")
-    run_stage(ctx, "shotplan")
     approve_gate(paths, "script")
+    run_stage(ctx, "shotplan")
     run_stage(ctx, "casting")
     locks = load_locks(series)
     for key, takes in read_takes(ctx, "casting").items():

@@ -233,15 +233,24 @@ def test_validate_master_rejects_wrong_format(tmp_path):
     assert "no audio stream" in problems
 
 
+def test_rehearsal_needs_director(tmp_path):
+    with pytest.raises(FileNotFoundError, match="--stage director"):
+        rehearse_episode(1, "lincoln", tmp_path / "dry", source=tmp_path / "empty")
+
+
 @pytest.mark.slow
 def test_rehearsal_makes_a_valid_master_and_reruns_free(tmp_path):
-    ctx = rehearse_episode(1, "lincoln", tmp_path)
+    source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
+    run_stage(source, "record")
+    _staged(source)
+    root = tmp_path / "dry"
+    ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
     final = ctx.paths.scope_dir / "cut" / "final.mp4"
     assert validate_master(final) == []
     check = json.loads((ctx.paths.scope_dir / "cut" / "master_check.json").read_text())
     assert abs(check["dialogue_lufs"] + 16) <= 1
 
-    ledger = Ledger(tmp_path / "lincoln" / "calls.jsonl")
+    ledger = Ledger(root / "lincoln" / "calls.jsonl")
     calls = ledger.current()
     assert all(r.status == "ok" for r in calls)
     assert {r.step for r in calls} >= {"look", "voice_design", "keyframe", "video", "voice",

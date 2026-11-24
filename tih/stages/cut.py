@@ -116,7 +116,7 @@ def run_cut(ctx: RunContext) -> None:
     final = stage_dir / "final.mp4"
     ffmpeg.run([
         "ffmpeg", "-y", "-v", "error", "-i", str(picture), "-i", str(mix),
-        "-filter_script:v", str(filter_script),
+        "-/filter:v", str(filter_script),
         "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "medium", "-crf", "18",
         "-profile:v", "high", "-pix_fmt", "yuv420p", "-r", str(plan.fps),
         "-c:a", "aac", "-b:a", "192k", "-t", f"{plan.runtime_s:.3f}",

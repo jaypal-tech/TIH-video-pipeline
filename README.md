@@ -20,7 +20,8 @@ Needs `ffmpeg` and `ffprobe` on the path.
 | `series/<s>/source/brief.txt` | the scripts (parsed by `record`) |
 | `series/<s>/bible.yaml` | every character's look and voice, places, style, banned words, overlay style |
 | `series/<s>/locks.yaml` | the owner's chosen reference image, seed and voice id per character |
-| `series/<s>/shots/epNN.yaml` | the shot plan: shots, prompts with `[CHARACTER]`/`[PLACE]` tokens, overlays, sound cues |
+| `series/<s>/shots/example.yaml` | a hand-made shot plan the Director follows for style (optional) |
+| `runs/<s>/epNN/director/shots.yaml` | the episode's shot plan, written by the Director: shots, prompts with `[CHARACTER]`/`[PLACE]` tokens, overlays, sound cues |
 | `series/<s>/pipeline.yaml` | which model does each step, its arguments and cost estimate |
 | `series/<s>/models.yaml` | prices used to log the cost of every call |
 
@@ -28,13 +29,14 @@ Needs `ffmpeg` and `ffprobe` on the path.
 
 ```bash
 S="--series lincoln"
-tih run 1 --stage record $S        # parse the script
-tih run 1 --stage shotplan $S      # check the shot plan against script and bible
+tih run 1 --stage writers_room $S  # the episode script (after the season Story Lock)
 tih approve 1 script $S            # Script Lock
+tih run 1 --stage director $S      # the shot plan, written from the locked script and checked
+tih run 1 --stage shotplan $S      # resolve the plan against script and bible (free)
 tih run 1 --stage casting $S       # candidate looks and voices (paid, only unlocked characters)
 tih lock look booth --image <chosen.png> --seed 1866 $S
 tih lock voice booth --voice-id <id> $S
-tih approve 1 look $S              # Look Lock
+tih approve 1 look $S              # Look Lock: bible, locks and the shot plan
 tih episode 1 $S                   # keyframes, motion, voice, lipsync, sound, cut
 ```
 
@@ -47,14 +49,16 @@ The finished file is `runs/<s>/ep01/cut/final.mp4`. The cut fails unless
 tih rehearse 1 $S
 ```
 
-Runs every stage with placeholder media (flat frames, tones) in `runs-dry/`.
+Needs the Writer and Director to have run for the episode. Copies the locked
+script and the shot plan into `runs-dry/`, then runs every video stage with
+placeholder media (flat frames, tones).
 You get a real-length cut with the real captions, cards and timing, and the
 estimated cost of the real run from `models.yaml`.
 
 ## Re-run one episode from its script
 
 ```bash
-tih episode 1 $S --from record --force
+tih episode 1 $S --from director --force
 ```
 
 Every stage runs again, but each generation call is matched to the earlier
