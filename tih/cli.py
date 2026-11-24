@@ -23,6 +23,7 @@ from tih.providers.fal import GatewayContext
 from tih.stages import camera as _camera  # noqa: F401  registers the stage
 from tih.stages import casting as _casting  # noqa: F401  registers the stage
 from tih.stages import cut as _cut  # noqa: F401  registers the stage
+from tih.stages import director as _director  # noqa: F401  registers the stage
 from tih.stages import historians_desk as _historians_desk  # noqa: F401  registers the stage
 from tih.stages import lipsync as _lipsync  # noqa: F401  registers the stage
 from tih.stages import performance as _performance  # noqa: F401  registers the stage

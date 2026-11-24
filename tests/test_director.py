@@ -1,0 +1,99 @@
+import shutil
+from pathlib import Path
+
+import pytest
+
+from tih.gates import GateNotApproved, approve
+from tih.paths import RunPaths
+from tih.shots import ShotPlan, example_plan_path, load_plan, plan_path
+from tih.stages import director, registry
+from tih.stages.registry import RunContext, run_stage
+
+from test_story_stages import FakeClient, make_llm, reply
+
+ROOT = Path(__file__).parents[1]
+
+
+@pytest.fixture
+def ctx(tmp_path, monkeypatch):
+    """Episode 1 with the draft standing in for the locked Writer script."""
+    monkeypatch.chdir(ROOT)
+    context = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path))
+    run_stage(context, "record")
+    scope = context.paths.scope_dir
+    (scope / "writers_room").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(scope / "record" / "script.yaml", scope / "writers_room" / "script.yaml")
+    registry._write_done(context, "writers_room")
+    return context
+
+
+def good() -> ShotPlan:
+    return load_plan(example_plan_path("lincoln"))
+
+
+def bad_line() -> ShotPlan:
+    plan = good()
+    plan.shots[0].line = "You could hit him."
+    return plan
+
+
+def wrong_episode() -> ShotPlan:
+    plan = good()
+    plan.episode = 2
+    return plan
+
+
+def run(ctx, tmp_path, monkeypatch, *plans):
+    client = FakeClient(*[reply(p, number=i) for i, p in enumerate(plans)])
+    llm = make_llm(tmp_path, client)
+    monkeypatch.setattr(director.LlmContext, "for_run", lambda paths: llm)
+    director.run_director(ctx)
+    return client
+
+
+def test_director_refuses_without_script_lock(ctx, tmp_path, monkeypatch):
+    client = FakeClient()
+    monkeypatch.setattr(director.LlmContext, "for_run", lambda paths: make_llm(tmp_path, client))
+    with pytest.raises(GateNotApproved):
+        director.run_director(ctx)
+    assert client.calls == []
+
+
+def test_director_writes_checked_plan(ctx, tmp_path, monkeypatch):
+    approve(ctx.paths, "script")
+    client = run(ctx, tmp_path, monkeypatch, good())
+    assert len(client.calls) == 1
+    assert load_plan(plan_path(ctx.paths)) == good()
+    assert "29 shots" in (ctx.paths.stage_dir("director") / "plan.md").read_text(encoding="utf-8")
+
+
+def test_director_brief_has_script_bible_and_example(ctx, tmp_path, monkeypatch):
+    approve(ctx.paths, "script")
+    client = run(ctx, tmp_path, monkeypatch, good())
+    sent = client.sent(0)
+    for tag in ("<script>", "<bible>", "<example_plan>", "<series_config>"):
+        assert tag in sent
+    assert "You could hit him from here." in sent
+    assert "Write the shot plan for episode 1." in sent
+
+
+def test_director_repairs_once(ctx, tmp_path, monkeypatch):
+    approve(ctx.paths, "script")
+    client = run(ctx, tmp_path, monkeypatch, bad_line(), good())
+    assert len(client.calls) == 2
+    assert "line is not an exact part" in client.sent(1)
+    assert "<shot_plan>" in client.sent(1)
+    assert load_plan(plan_path(ctx.paths)) == good()
+
+
+def test_director_fails_after_repair(ctx, tmp_path, monkeypatch):
+    approve(ctx.paths, "script")
+    with pytest.raises(director.DirectorFailed, match="exact part"):
+        run(ctx, tmp_path, monkeypatch, bad_line(), bad_line())
+    assert not plan_path(ctx.paths).exists()
+
+
+def test_director_rejects_wrong_episode(ctx, tmp_path, monkeypatch):
+    approve(ctx.paths, "script")
+    with pytest.raises(director.DirectorFailed, match="episode 2"):
+        run(ctx, tmp_path, monkeypatch, wrong_episode(), wrong_episode())
