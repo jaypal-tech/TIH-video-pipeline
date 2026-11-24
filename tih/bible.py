@@ -95,10 +95,20 @@ class CharacterLock(BaseModel):
     voice_endpoint: str | None = None
 
 
+class PlaceLock(BaseModel):
+    """One approved empty view of a place, attached to every keyframe set there."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reference: str
+    reference_sha256: str | None = None
+
+
 class Locks(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     characters: dict[str, CharacterLock] = Field(default_factory=dict)
+    places: dict[str, PlaceLock] = Field(default_factory=dict)
 
 
 class NotLocked(RuntimeError):
@@ -196,6 +206,19 @@ def require_look(locks: Locks, character_id: str) -> CharacterLock:
         raise NotLocked(f"Locked reference for {character_id} is missing: {reference}")
     if lock.reference_sha256 and file_sha256(reference) != lock.reference_sha256:
         raise NotLocked(f"Reference for {character_id} changed after it was locked")
+    return lock
+
+
+def require_plate(locks: Locks, place_id: str) -> PlaceLock:
+    """Return the locked plate, checking the file is the one approved."""
+    lock = locks.places.get(place_id)
+    if not lock:
+        raise NotLocked(f"No locked plate for place {place_id}. Run tih run <ep> --stage plates, then tih lock place.")
+    reference = Path(lock.reference)
+    if not reference.exists():
+        raise NotLocked(f"Locked plate for {place_id} is missing: {reference}")
+    if lock.reference_sha256 and file_sha256(reference) != lock.reference_sha256:
+        raise NotLocked(f"Plate for {place_id} changed after it was locked")
     return lock
 
 

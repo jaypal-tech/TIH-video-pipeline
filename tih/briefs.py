@@ -9,7 +9,7 @@ variants; pipeline.yaml picks one per endpoint with a `{name}` template.
 
 import re
 
-from tih.bible import TOKEN, Bible, Character
+from tih.bible import TOKEN, Bible, Character, Place
 from tih.shots import Cue, ResolvedShot
 
 CAMERA_MOVES = ("push", "pull", "pan", "tilt", "track", "handheld", "orbit", "dolly", "crane", "zoom")
@@ -58,7 +58,7 @@ def _describe(text: str, bible: Bible, labels: dict[str, str]) -> str:
     return TOKEN.sub(replace, text)
 
 
-def _keyframe_prompt(shot: ResolvedShot, bible: Bible, word: str) -> str:
+def _keyframe_prompt(shot: ResolvedShot, bible: Bible, word: str, has_plate: bool) -> str:
     labels = {
         cid: f"the {role(bible.characters[cid])} from {word} {n}" for n, cid in enumerate(shot.cast, start=1)
     }
@@ -72,17 +72,34 @@ def _keyframe_prompt(shot: ResolvedShot, bible: Bible, word: str) -> str:
             keep = "keep their faces, hair and costumes exactly as in the references"
         parts.append(f"Using {who}, {keep}.")
     parts.append(_sentence(_describe(shot.keyframe, bible, labels)))
+    if has_plate:
+        plate = len(shot.cast) + 1
+        parts.append(
+            f"Match the location, light direction and weather of {word} {plate}; change nothing about the place."
+        )
     parts.append(_sentence(bible.style.look))
     if bible.style.clean:
         parts.append(_sentence(bible.style.clean))
     return " ".join(parts)
 
 
-def keyframe_brief(shot: ResolvedShot, bible: Bible) -> dict[str, str]:
+def keyframe_brief(shot: ResolvedShot, bible: Bible, has_plate: bool = False) -> dict[str, str]:
+    """The plate, when attached, is the last reference: after the cast, in cast order."""
     return {
-        "prompt_gemini": _keyframe_prompt(shot, bible, "image"),
-        "prompt_seedream": _keyframe_prompt(shot, bible, "Figure"),
+        "prompt_gemini": _keyframe_prompt(shot, bible, "image", has_plate),
+        "prompt_seedream": _keyframe_prompt(shot, bible, "Figure", has_plate),
     }
+
+
+def plate_brief(place: Place, bible: Bible) -> dict[str, str]:
+    """An empty establishing view of a place, the backdrop every shot there must match."""
+    prompt = " ".join([
+        _sentence(f"Empty establishing view, eye level, of {place.look}"),
+        "No people in the foreground; nobody's face visible; the place exactly as it looks behind the actors.",
+        _sentence(bible.style.look),
+        _sentence(bible.style.clean) if bible.style.clean else "",
+    ]).strip()
+    return {"prompt_gemini": prompt}
 
 
 def _mouth(shot: ResolvedShot, bible: Bible) -> str:

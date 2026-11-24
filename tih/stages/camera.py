@@ -9,7 +9,7 @@ character's locked seed is used. Shots with nobody in them use the text-only ste
 from pathlib import Path
 
 from tih.assets import ShotRef
-from tih.bible import load_bible, load_locks, require_look
+from tih.bible import load_bible, load_locks, require_look, require_plate
 from tih.briefs import keyframe_brief
 from tih.gates import require_approved
 from tih.production import (
@@ -36,10 +36,17 @@ def run_keyframes(ctx: RunContext) -> None:
     steps = load_pipeline(ctx.paths.series).steps
     gateway = gateway_for(ctx)
 
+    # every look and plate is checked before anything is spent
+    for shot in plan.shots:
+        for character in shot.cast:
+            require_look(locks, character)
+    plates = {place: require_plate(locks, place) for place in dict.fromkeys(s.place for s in plan.shots)}
+
     sets: dict[str, TakeSet] = {}
     for shot in plan.shots:
         character_locks = [require_look(locks, c) for c in shot.cast]
         references = [upload_local(gateway, Path(lock.reference)) for lock in character_locks]
+        references.append(upload_local(gateway, Path(plates[shot.place].reference)))
         step = "keyframe" if references else "keyframe_no_refs"
         config = steps[step]
         base_seed = next((lock.seed for lock in character_locks if lock.seed is not None), None)
@@ -50,7 +57,7 @@ def run_keyframes(ctx: RunContext) -> None:
                 config,
                 "keyframe",
                 {
-                    **keyframe_brief(shot, bible),
+                    **keyframe_brief(shot, bible, has_plate=True),
                     "image_urls": references or None,
                     "seed": seed_for(base_seed, take),
                 },

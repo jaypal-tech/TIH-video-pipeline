@@ -7,6 +7,7 @@ import typer
 from tih.bible import (
     LOCKS_OVERRIDE,
     CharacterLock,
+    PlaceLock,
     file_sha256,
     load_bible,
     load_locks,
@@ -28,6 +29,7 @@ from tih.stages import director as _director  # noqa: F401  registers the stage
 from tih.stages import historians_desk as _historians_desk  # noqa: F401  registers the stage
 from tih.stages import lipsync as _lipsync  # noqa: F401  registers the stage
 from tih.stages import performance as _performance  # noqa: F401  registers the stage
+from tih.stages import plates as _plates  # noqa: F401  registers the stage
 from tih.stages import record as _record  # noqa: F401  registers the stage
 from tih.stages import shotplan as _shotplan  # noqa: F401  registers the stage
 from tih.stages import sound as _sound  # noqa: F401  registers the stage
@@ -114,6 +116,7 @@ def rehearse_episode(number: int, series: str, root: Path, source: Path = Path("
     # force: a new script or plan copied in must replace the last rehearsal; reused takes cost $0
     run_stage(ctx, "shotplan", force=True)
     run_stage(ctx, "casting", force=True)
+    run_stage(ctx, "plates", force=True)
     locks = load_locks(series)
     for key, takes in read_takes(ctx, "casting").items():
         kind, character = key.split(":")
@@ -124,6 +127,9 @@ def rehearse_episode(number: int, series: str, root: Path, source: Path = Path("
         else:
             lock.voice_id = first.note.removeprefix("voice id ")
         locks.characters[character] = lock
+    for key, takes in read_takes(ctx, "plates").items():
+        first = next(t for t in takes.takes if t.status == "ok")
+        locks.places[key.split(":")[1]] = PlaceLock(reference=first.path, reference_sha256=file_sha256(Path(first.path)))
     save_locks(series, locks)
     approve_gate(paths, "look")
     for stage in EPISODE_STAGES[2:]:
@@ -207,6 +213,27 @@ def lock_look(
     save_locks(series, locks)
     _mark_kept(series, root, image)
     typer.echo(f"Locked {character}'s look: {target}. Approve again with tih approve <ep> look.")
+
+
+@lock_app.command("place")
+def lock_place(
+    place: str,
+    image: Path = typer.Option(..., "--image", exists=True, dir_okay=False),
+    series: str = typer.Option(..., "--series"),
+    root: Path = typer.Option(Path("runs"), "--root"),
+) -> None:
+    """Lock a place's plate: the empty view every keyframe there must match."""
+    if place not in load_bible(series).places:
+        raise typer.BadParameter(f"{place} is not a place in the bible")
+    target_dir = series_dir(series) / "assets" / "places" / place
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"plate{image.suffix}"
+    shutil.copyfile(image, target)
+    locks = load_locks(series)
+    locks.places[place] = PlaceLock(reference=str(target), reference_sha256=file_sha256(target))
+    save_locks(series, locks)
+    _mark_kept(series, root, image)
+    typer.echo(f"Locked the plate for {place}: {target}. Approve again with tih approve <ep> look.")
 
 
 @lock_app.command("voice")

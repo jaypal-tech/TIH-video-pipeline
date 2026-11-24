@@ -34,6 +34,16 @@ steps:
       prompt: "{voice_description}"
       preview_text: "{preview_text}"
 
+  plate: # one empty view of each place, locked and attached to every keyframe there
+    endpoint: google/nano-banana-2.1
+    estimate_usd: 0.15
+    takes: 2
+    arguments:
+      prompt: "{prompt_gemini}"
+      aspect_ratio: "9:16"
+      seed: "{seed}"
+      num_images: 1
+
   keyframe:
     endpoint: google/nano-banana-2.1/edit
     estimate_usd: 0.15
