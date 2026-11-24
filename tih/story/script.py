@@ -25,31 +25,68 @@ def _beats(script: Episode) -> list[Beat]:
     return [beat for clip in script.clips for beat in clip.beats]
 
 
-def _protected(script: Episode) -> Counter[tuple[str, str, str]]:
+def _protected(script: Episode) -> Counter[tuple[str, str, str, str | None, str | None]]:
     return Counter(
-        (beat.line.speaker, beat.line.text, beat.line.evidence.value)
+        (
+            beat.line.speaker,
+            beat.line.text,
+            beat.line.evidence.value,
+            beat.line.evidence_label,
+            beat.line.source_id,
+        )
         for beat in _beats(script)
         if beat.line and beat.line.evidence in PROTECTED
     )
 
 
 def check_script(
-    script: Episode, number: int, canon: Canon, config: SeriesConfig, draft: Episode | None
+    script: Episode,
+    number: int,
+    canon: Canon,
+    config: SeriesConfig,
+    draft: Episode | None,
+    speakers: dict[str, str] | None = None,
 ) -> list[Violation]:
-    """Return every hard rule the script breaks."""
+    """Return every hard rule the script breaks.
+
+    `speakers` maps a real or reported line to who said it, where the source tells us.
+    """
     found = []
+    speakers = speakers or {}
     if script.number != number:
         found.append(Violation("number", f"Script is episode {script.number}, expected {number}."))
     low, high = config.runtime_s
     if not low <= script.runtime_s <= high:
         found.append(Violation("runtime", f"Runtime {script.runtime_s} s is outside {low}-{high} s."))
     beats = _beats(script)
+    if not script.clips or any(not clip.beats for clip in script.clips):
+        found.append(Violation("empty", "The script and every clip must have at least one beat."))
     starts = [beat.start_s for beat in beats]
     if starts != sorted(starts) or (beats and beats[-1].start_s >= script.runtime_s):
         found.append(Violation("timing", "Beat start times must run in order within the runtime."))
     allowed = {Evidence.real_words: set(canon.real_words), Evidence.reported: set(canon.reported)}
+    canon_lines = set(canon.real_words) | set(canon.reported)
     for beat in beats:
-        if beat.line and beat.line.evidence in PROTECTED and beat.line.text not in allowed[beat.line.evidence]:
+        if not beat.line:
+            continue
+        if beat.line.evidence not in PROTECTED and beat.line.text in canon_lines:
+            found.append(
+                Violation(
+                    "mislabelled",
+                    f"Beat {beat.id}: '{beat.line.text}' is a source quote but is marked "
+                    f"{beat.line.evidence.value}.",
+                )
+            )
+        expected = speakers.get(beat.line.text)
+        if beat.line.evidence in PROTECTED and expected and beat.line.speaker != expected:
+            found.append(
+                Violation(
+                    "wrong_speaker",
+                    f"Beat {beat.id}: '{beat.line.text}' was said by {expected}, "
+                    f"not {beat.line.speaker}.",
+                )
+            )
+        if beat.line.evidence in PROTECTED and beat.line.text not in allowed[beat.line.evidence]:
             found.append(
                 Violation(
                     beat.line.evidence.value,
@@ -58,9 +95,9 @@ def check_script(
             )
     if draft is not None:
         missing = _protected(draft) - _protected(script)
-        for (speaker, text, _), count in missing.items():
+        for (speaker, text, *_), count in missing.items():
             found.append(
-                Violation("protected_dropped", f"{speaker}: '{text}' was dropped ({count} missing).")
+                Violation("protected_dropped", f"{speaker}: '{text}' was dropped or its label changed ({count} missing).")
             )
     if beats and beats[-1].line and beats[-1].line.evidence == Evidence.dramatized:
         found.append(

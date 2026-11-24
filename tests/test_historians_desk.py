@@ -97,3 +97,18 @@ def test_no_story_names_in_historian_engine():
     for path in ("tih/stages/historians_desk.py", "tih/story/truth.py", "prompts/historian.md"):
         text = (ROOT / path).read_text("utf-8")
         assert not any(name in text for name in ("Lincoln", "Booth", "Surratt")), path
+
+
+def test_quote_must_be_in_the_named_beat(written):
+    _, script = written
+    elsewhere = TruthFinding(beat="e1c2b2", quote="You could hit him from here.", kind="unsupported", problem="x", proposal="y")
+    missing = TruthFinding(beat="nope", quote="You could hit him from here.", kind="unsupported", problem="x", proposal="y")
+    kept, dropped, _ = review_report(TruthReport(findings=[elsewhere, missing, finding("You could hit him from here.")], notes=[]), script, [])
+    assert [f.beat for f in kept] == ["e1c1b1"] and dropped == 2
+
+
+@pytest.mark.parametrize("quote", [" ", "e", "  hi "])
+def test_too_short_quote_is_dropped(written, quote):
+    _, script = written
+    kept, dropped, _ = review_report(TruthReport(findings=[finding(quote)], notes=[]), script, [])
+    assert kept == [] and dropped == 1

@@ -25,23 +25,29 @@ class TruthReport(BaseModel):
     notes: list[NoteAnswer]
 
 
-def _script_texts(script: Episode) -> list[str]:
-    texts = []
+MIN_QUOTE = 3
+
+
+def _beat_texts(script: Episode) -> dict[str, list[str]]:
+    texts = {}
     for clip in script.clips:
         for beat in clip.beats:
-            texts.append(beat.picture)
+            texts[beat.id] = [beat.picture] + [overlay.text for overlay in beat.overlays]
             if beat.line:
-                texts.append(beat.line.text)
-            texts += [overlay.text for overlay in beat.overlays]
+                texts[beat.id].append(beat.line.text)
     return texts
 
 
 def review_report(
     report: TruthReport, script: Episode, notes: list[str]
 ) -> tuple[list[TruthFinding], int, list[str]]:
-    """Keep findings that quote the script, and list notes left unanswered."""
-    texts = _script_texts(script)
-    kept = [f for f in report.findings if f.quote and any(f.quote in text for text in texts)]
+    """Keep findings that quote their own beat, and list notes left unanswered."""
+    texts = _beat_texts(script)
+    kept = [
+        f
+        for f in report.findings
+        if len(f.quote.strip()) >= MIN_QUOTE and any(f.quote in text for text in texts.get(f.beat, []))
+    ]
     answered = {answer.note for answer in report.notes}
     unanswered = [note for note in notes if note not in answered]
     return kept, len(report.findings) - len(kept), unanswered
@@ -55,7 +61,7 @@ def render_truth_report(
     unanswered: list[str],
 ) -> str:
     out = [f"# Truth report: {title}", ""]
-    out.append(f"{len(kept)} findings. {dropped} dropped because their quote is not in the script.")
+    out.append(f"{len(kept)} findings. {dropped} dropped because their quote is not in the beat they name.")
     out.append("")
     if unanswered:
         out += ["## Not answered", ""] + [f"- {note}" for note in unanswered] + [""]

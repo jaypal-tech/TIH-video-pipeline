@@ -7,7 +7,7 @@ from tih.paths import RunPaths
 from tih.series import SeriesConfig
 from tih.stages.record import run_record
 from tih.stages.registry import RunContext
-from tih.story.models import Beat, Canon, Clip, Episode, Line
+from tih.story.models import Beat, Canon, Clip, Episode, Evidence, Line
 from tih.story.script import ScriptChange, check_script, render_script, render_script_changes
 
 ROOT = Path(__file__).parents[1]
@@ -143,3 +143,43 @@ def test_render_changes_lists_before_after_reason():
 def test_render_changes_without_draft_says_written_from_plan():
     page = render_script_changes("Episode 6", [], had_draft=False)
     assert "Written from the season plan; there was no draft." in page
+
+
+SPEAKERS = {LAST_SPEECH: "BOOTH"}
+
+
+def test_changed_label_on_protected_line_is_caught(record):
+    draft, canon = record
+    script = draft.model_copy(deep=True)
+    with_line(script, LAST_SPEECH).line.evidence_label = "REPORTED · 1867"
+    assert rules(check_script(script, 1, canon, CONFIG, draft)) == ["protected_dropped"]
+
+
+def test_canon_line_marked_dramatized_is_caught_without_draft(record):
+    draft, canon = record
+    script = draft.model_copy(deep=True)
+    with_line(script, LAST_SPEECH).line.evidence = Evidence.dramatized
+    assert rules(check_script(script, 1, canon, CONFIG, None)) == ["mislabelled"]
+
+
+def test_canon_line_given_to_wrong_speaker_is_caught_without_draft(record):
+    draft, canon = record
+    script = draft.model_copy(deep=True)
+    with_line(script, LAST_SPEECH).line.speaker = "ATZERODT"
+    found = check_script(script, 1, canon, CONFIG, None, SPEAKERS)
+    assert rules(found) == ["wrong_speaker"]
+    assert "BOOTH" in found[0].detail
+
+
+def test_empty_script_is_a_violation(record):
+    draft, canon = record
+    script = draft.model_copy(deep=True)
+    script.clips = []
+    assert "empty" in rules(check_script(script, 1, canon, CONFIG, None))
+
+
+def test_clip_without_beats_is_a_violation(record):
+    draft, canon = record
+    script = draft.model_copy(deep=True)
+    script.clips[1].beats = []
+    assert rules(check_script(script, 1, canon, CONFIG, None)) == ["empty"]

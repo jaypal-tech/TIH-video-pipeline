@@ -9,7 +9,7 @@ from tih.series import SeriesConfig, load_series
 from tih.stages.registry import RunContext, Stage, register
 from tih.stages.story_room import PROMPTS, _tag, _yaml
 from tih.story.models import Canon, Episode
-from tih.story.script import WriterResult, check_script, render_script, render_script_changes
+from tih.story.script import PROTECTED, WriterResult, check_script, render_script, render_script_changes
 from tih.story.season import SeasonPlan
 
 
@@ -21,12 +21,19 @@ def _load(path: Path):
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def _draft(season: RunPaths, number: int) -> Episode | None:
-    episodes = _load(season.stage_dir("record") / "script.yaml") or []
-    for episode in episodes:
-        if episode["number"] == number:
-            return Episode(**episode)
-    return None
+def _drafts(season: RunPaths) -> list[Episode]:
+    return [Episode(**e) for e in _load(season.stage_dir("record") / "script.yaml") or []]
+
+
+def _speakers(drafts: list[Episode]) -> dict[str, str]:
+    """Who said each real or reported line, as the source's drafts record it."""
+    return {
+        beat.line.text: beat.line.speaker
+        for draft in drafts
+        for clip in draft.clips
+        for beat in clip.beats
+        if beat.line and beat.line.evidence in PROTECTED
+    }
 
 
 def _brief(config: SeriesConfig, source: str, plan: SeasonPlan, number: int, canon: Canon, draft: Episode | None) -> str:
@@ -75,7 +82,9 @@ def _run(ctx: RunContext, llm: LlmContext) -> None:
     config = load_series(ctx.paths.series)
     source = (Path("series") / ctx.paths.series / "source" / "brief.txt").read_text("utf-8")
     canon = Canon(**_load(season.stage_dir("record") / "canon.yaml"))
-    draft = _draft(season, number)
+    drafts = _drafts(season)
+    draft = next((d for d in drafts if d.number == number), None)
+    speakers = _speakers(drafts)
 
     base = _brief(config, source, plan, number, canon, draft)
     task = (
@@ -85,7 +94,7 @@ def _run(ctx: RunContext, llm: LlmContext) -> None:
     )
     system = (PROMPTS / "writer.md").read_text(encoding="utf-8")
     result = ask_json(llm, "writer", system, base + task, WriterResult)
-    violations = check_script(result.script, number, canon, config, draft)
+    violations = check_script(result.script, number, canon, config, draft, speakers)
     if violations:
         problems = "\n".join(f"- {v.rule}: {v.detail}" for v in violations)
         result = ask_json(
@@ -99,7 +108,7 @@ def _run(ctx: RunContext, llm: LlmContext) -> None:
             "Return the full script and the full change list.",
             WriterResult,
         )
-        violations = check_script(result.script, number, canon, config, draft)
+        violations = check_script(result.script, number, canon, config, draft, speakers)
         if violations:
             problems = "\n".join(f"- {v.rule}: {v.detail}" for v in violations)
             raise WritersRoomFailed(f"Script still breaks the rules:\n{problems}")
