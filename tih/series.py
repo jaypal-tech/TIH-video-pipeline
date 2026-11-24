@@ -25,6 +25,8 @@ class SeriesConfig(BaseModel):
     ending_convention: str = ""
     batch_size: int = 10
     source_format: Literal["table_script", "freeform"] = "freeform"
+    runtime_s: tuple[int, int] = (60, 90)
+    script_notes: dict[int, list[str]] = Field(default_factory=dict)
 
 
 def load_series(name: str) -> SeriesConfig:
