@@ -21,7 +21,7 @@ from tih.media import ffmpeg
 from tih.media.overlays import filters as overlay_filters
 from tih.production import load_resolved, read_takes
 from tih.stages.registry import RunContext, Stage, register
-from tih.stages.voice import line_shots
+from tih.stages.voice import line_pieces
 
 SAMPLE_RATE = 48000
 FLASH_SECONDS = 0.5
@@ -73,8 +73,8 @@ def _mix_inputs(inputs: list[tuple[Path, float, float | None, float]], runtime: 
 def _sound(ctx: RunContext, plan, work: Path) -> tuple[Path, ffmpeg.Loudness | None]:
     voice = read_takes(ctx, "voice")
     sound = read_takes(ctx, "sound")
-    # one take per line, placed where the line's first shot starts
-    lines = [(Path(voice[beat].chosen), shots[0].start_s, None, 0.0) for beat, shots in line_shots(plan).items()]
+    # each shot's piece of its line at that shot's start: the same slice its lips were synced to
+    lines = [(path, at, None, 0.0) for path, at in line_pieces(ctx, plan, work / "lines")]
     raw_dialogue = work / "dialogue_raw.wav"
     _mix_inputs(lines, plan.runtime_s, raw_dialogue)
     dialogue = work / "dialogue.wav"

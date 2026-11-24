@@ -28,7 +28,7 @@ from tih.shots import PlanError, example_plan_path, load_plan, plan_path, resolv
 from tih.stages.performance import model_duration, source_seconds
 from tih.stages import registry
 from tih.stages.registry import RunContext, run_stage
-from tih.stages.voice import slice_for_shot, speech_text, word_difference
+from tih.stages.voice import line_pieces, slice_for_shot, speech_text, word_difference
 from tih.story.models import Episode
 
 ROOT = Path(__file__).parents[1]
@@ -405,8 +405,20 @@ def test_slice_for_shot_boundaries():
     timed = [{"text": w, "start": i * 0.5, "end": i * 0.5 + 0.4, "type": "word"} for i, w in enumerate(spoken)]
     timed.insert(1, {"text": " ", "start": 0.4, "end": 0.5, "type": "spacing"})
     pieces = ["I would myself prefer", "that it were now"]
+    # the first piece keeps the take's lead-in, the last keeps its tail: lips and soundtrack share one clock
     assert slice_for_shot(timed, pieces, 0) == (0.0, 2.0)
-    assert slice_for_shot(timed, pieces, 1) == (2.0, 3.9)
+    assert slice_for_shot(timed, pieces, 1) == (2.0, None)
+
+
+def test_slice_counts_hyphenated_words_like_the_script():
+    timed = [{"text": w, "start": i * 1.0, "end": i * 1.0 + 0.8, "type": "word"}
+             for i, w in enumerate(["twenty-five", "men", "came", "tonight"])]
+    assert slice_for_shot(timed, ["twenty-five men", "came tonight"], 1) == (2.0, None)
+
+
+def test_lipsync_pads_with_silence():
+    pipeline = yaml.safe_load((ROOT / "series" / "lincoln" / "pipeline.yaml").read_text(encoding="utf-8"))
+    assert pipeline["steps"]["lipsync"]["arguments"]["sync_mode"] == "silence"
 
 
 def test_lipsync_shot_needs_one_face(episode_one):
@@ -435,3 +447,6 @@ def test_line_voiced_once_and_sliced_per_shot(tmp_path):
     whole = duration(Path(voice[shot.beat].chosen))
     piece = duration(ctx.paths.scope_dir / "lipsync" / "audio" / "4.1.wav")
     assert 0 < piece < whole
+    placed = {path.stem: at for path, at in line_pieces(ctx, plan, tmp_path / "pieces")}
+    for shot_id in ("4.1", "4.2"):
+        assert placed[shot_id] == next(s.start_s for s in plan.shots if s.id == shot_id)

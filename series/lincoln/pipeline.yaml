@@ -118,7 +118,7 @@ steps:
     arguments:
       video_url: "{video_url}"
       audio_url: "{audio_url}"
-      sync_mode: cut_off
+      sync_mode: silence # pad the words with silence to the shot's length; cut_off froze the face
 
   music:
     endpoint: elevenlabs/music/v2.5

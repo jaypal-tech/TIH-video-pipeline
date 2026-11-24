@@ -16,6 +16,7 @@ from pathlib import Path
 from tih.assets import ShotRef
 from tih.bible import load_locks, require_voice
 from tih.briefs import speech_settings
+from tih.media import ffmpeg
 from tih.gates import require_approved
 from tih.production import (
     TakeSet,
@@ -24,6 +25,7 @@ from tih.production import (
     gateway_for,
     load_pipeline,
     load_resolved,
+    read_takes,
     take_from,
     write_takes,
 )
@@ -59,25 +61,41 @@ def word_timings_path(audio: Path) -> Path:
 
 
 def spoken_words(timings: list[dict]) -> list[dict]:
-    return [w for w in timings if w.get("type", "word") == "word" and words(str(w.get("text", "")))]
+    """One entry per script word: a Scribe token like "twenty-five" counts as the script counts it."""
+    expanded = []
+    for token in timings:
+        if token.get("type", "word") == "word":
+            expanded += [token] * len(words(str(token.get("text", ""))))
+    return expanded
 
 
-def slice_for_shot(timings: list[dict], pieces: list[str], index: int) -> tuple[float, float]:
+def slice_for_shot(timings: list[dict], pieces: list[str], index: int) -> tuple[float, float | None]:
     """Start and end seconds of piece `index` of a line, from the word timings.
 
     A piece runs from its first word to the next piece's first word, so the
-    breath between pieces stays with the earlier shot; the last piece ends on
-    its last word.
+    breath between pieces stays with the earlier shot. The first piece starts at
+    0 and the last runs to the end of the take (None), so every piece is placed
+    at its own shot's start and lips and soundtrack share one clock.
     """
     timed = spoken_words(timings)
     first = sum(len(words(piece)) for piece in pieces[:index])
     count = len(words(pieces[index]))
     if first + count > len(timed):
         raise ValueError(f"word timings cover {len(timed)} words; piece {index + 1} needs {first + count}")
-    start = float(timed[first]["start"])
+    start = 0.0 if index == 0 else float(timed[first]["start"])
     if first + count < len(timed):
         return start, float(timed[first + count]["start"])
-    return start, float(timed[-1]["end"])
+    return start, None
+
+
+def piece_audio(line: Path, pieces: list[str], index: int, out: Path) -> Path:
+    """One shot's words, cut from the whole-line take."""
+    timings = json.loads(word_timings_path(line).read_text(encoding="utf-8"))
+    start, end = slice_for_shot(timings, pieces, index)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    until = [] if end is None else ["-to", f"{end:.3f}"]
+    ffmpeg.run(["ffmpeg", "-y", "-v", "error", "-i", str(line), "-ss", f"{start:.3f}", *until, str(out)])
+    return out
 
 
 def line_shots(plan: ResolvedPlan) -> dict[str, list[ResolvedShot]]:
@@ -87,6 +105,18 @@ def line_shots(plan: ResolvedPlan) -> dict[str, list[ResolvedShot]]:
         if shot.line is not None:
             by_beat.setdefault(shot.beat, []).append(shot)
     return by_beat
+
+
+def line_pieces(ctx: RunContext, plan: ResolvedPlan, out_dir: Path) -> list[tuple[Path, float]]:
+    """Every shot's piece of its line, and where it starts: the shot's own start."""
+    voice = read_takes(ctx, "voice")
+    placed = []
+    for beat, shots in line_shots(plan).items():
+        pieces = [shot.line for shot in shots]
+        for index, shot in enumerate(shots):
+            out = piece_audio(Path(voice[beat].chosen), pieces, index, out_dir / f"{shot.id}.wav")
+            placed.append((out, shot.start_s))
+    return placed
 
 
 def run_voice(ctx: RunContext) -> None:

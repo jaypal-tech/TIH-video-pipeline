@@ -7,12 +7,10 @@ Scribe's word timings. Cost is logged
 from the clip's real length in minutes.
 """
 
-import json
 from pathlib import Path
 
 from tih.assets import ShotRef
 from tih.gates import require_approved
-from tih.media import ffmpeg
 from tih.media.ffmpeg import FfmpegError, duration
 from tih.production import (
     TakeSet,
@@ -27,7 +25,7 @@ from tih.production import (
 )
 from tih.providers.fal import upload_local
 from tih.stages.registry import RunContext, Stage, register
-from tih.stages.voice import line_shots, slice_for_shot, word_timings_path
+from tih.stages.voice import line_shots, piece_audio
 
 
 def _minutes(path: Path) -> float | None:
@@ -35,15 +33,6 @@ def _minutes(path: Path) -> float | None:
         return duration(path) / 60
     except (FfmpegError, KeyError, ValueError):
         return None
-
-
-def shot_audio(line: Path, pieces: list[str], index: int, out: Path) -> Path:
-    """This shot's words only, cut from the whole-line take."""
-    timings = json.loads(word_timings_path(line).read_text(encoding="utf-8"))
-    start, end = slice_for_shot(timings, pieces, index)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    ffmpeg.run(["ffmpeg", "-y", "-v", "error", "-i", str(line), "-ss", f"{start:.3f}", "-to", f"{end:.3f}", str(out)])
-    return out
 
 
 def run_lipsync(ctx: RunContext) -> None:
@@ -65,7 +54,7 @@ def run_lipsync(ctx: RunContext) -> None:
         shots = by_beat[shot.beat]
         pieces = [s.line for s in shots]
         index = [s.id for s in shots].index(shot.id)
-        audio = shot_audio(Path(voice[shot.beat].chosen), pieces, index, audio_dir / f"{shot.id}.wav")
+        audio = piece_audio(Path(voice[shot.beat].chosen), pieces, index, audio_dir / f"{shot.id}.wav")
         result = call_step(
             gateway,
             config,
