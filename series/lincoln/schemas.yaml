@@ -1,0 +1,15 @@
+# Accepted input arguments per fal endpoint, nested fields as parent.child.
+# Checked against fal's queue OpenAPI spec (openapi.json?endpoint_id=...) on 2026-11-24.
+# tests/test_production.py::test_pipeline_arguments_match_schemas fails if
+# pipeline.yaml sends anything not listed here.
+google/nano-banana-2.1: [prompt, num_images, seed, aspect_ratio, resolution, output_format, safety_tolerance, enable_web_search, system_prompt, thinking_level, limit_generations, sync_mode]
+google/nano-banana-2.1/edit: [prompt, image_urls, pdf_url, video_url, num_images, seed, aspect_ratio, resolution, output_format, safety_tolerance, enable_web_search, system_prompt, thinking_level, limit_generations, sync_mode]
+bytedance/seedream/v5.5/edit: [prompt, image_urls, image_size, image_size.width, image_size.height, num_images, output_format, background, watermark, enable_safety_checker, sync_mode]
+fal-ai/kling-video/v3/pro/image-to-video: [start_image_url, end_image_url, prompt, negative_prompt, duration, cfg_scale, generate_audio, shot_type, multi_prompt, multi_prompt.prompt, multi_prompt.duration, elements, elements.frontal_image_url, elements.reference_image_urls, elements.video_url, elements.voice_id, enable_safety_checker]
+minimax/h3-max/image-to-video: [prompt, image_url, end_image_url, target_audio_url, duration, resolution, prompt_expansion_mode, seed, sync_mode, enable_safety_checker]
+fal-ai/minimax/voice-design: [prompt, preview_text, enable_safety_checker]
+fal-ai/minimax/speech-2.8-hd: [prompt, voice_setting, voice_setting.voice_id, voice_setting.speed, voice_setting.vol, voice_setting.pitch, voice_setting.emotion, voice_setting.english_normalization, audio_setting, audio_setting.sample_rate, audio_setting.bitrate, audio_setting.format, audio_setting.channel, language_boost, output_format, pronunciation_dict, pronunciation_dict.tone_list, voice_modify, voice_modify.pitch, voice_modify.timbre, voice_modify.intensity, normalization_setting, normalization_setting.enabled, normalization_setting.target_loudness, normalization_setting.target_range, normalization_setting.target_peak, enable_safety_checker]
+fal-ai/elevenlabs/speech-to-text/scribe-v2: [audio_url, language_code, tag_audio_events, diarize, keyterms]
+fal-ai/sync-lipsync/v3: [video_url, audio_url, sync_mode, options, options.sync_mode, options.model_mode, options.prompt, options.temperature, options.occlusion_detection_enabled, options.active_speaker_detection, enable_safety_checker]
+elevenlabs/music/v2.5: [prompt, music_length_ms, seed, force_instrumental, output_format, composition_plan, enable_safety_checker]
+elevenlabs/sound-effects/v3: [text, duration_seconds, loop, prompt_influence, output_format, enable_safety_checker]

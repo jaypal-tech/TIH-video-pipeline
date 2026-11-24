@@ -81,7 +81,7 @@ class DryRunTransport:
             url = self._url(request_id, ".mp3", {"kind": "tone", "seconds": 2.0, "text": ""})
             return {"custom_voice_id": f"dry-voice-{request_id[4:12]}", "audio": {"url": url}}
         if kind == "speech":
-            text = PAUSE_TAG.sub(" ", str(arguments.get("text", "")))
+            text = PAUSE_TAG.sub(" ", str(arguments.get("prompt", arguments.get("text", ""))))
             seconds = max(1.0, len(text.split()) * SECONDS_PER_WORD)
             url = self._url(request_id, ".mp3", {"kind": "tone", "seconds": seconds, "text": text})
             return {"audio": {"url": url}}
@@ -95,7 +95,7 @@ class DryRunTransport:
             url = self._url(request_id, ".mp4", {"kind": "copy", "source": str(video)})
             return {"video": {"url": url}}
         if kind == "video":
-            image = self.uploads[str(arguments["image_url"])]
+            image = self.uploads[str(arguments.get("start_image_url", arguments.get("image_url")))]
             seconds = float(str(arguments.get("duration", "5")).rstrip("s"))
             url = self._url(request_id, ".mp4", {"kind": "hold", "source": str(image), "seconds": seconds})
             return {"video": {"url": url}}

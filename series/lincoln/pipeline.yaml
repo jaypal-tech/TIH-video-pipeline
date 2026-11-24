@@ -8,9 +8,8 @@
 # duration, text, voice_id, voice_description, preview_text, video_url,
 # audio_url, duration_seconds, length_ms.
 #
-# VERIFY BEFORE THE FIRST PAID RUN: argument names below follow fal's usual
-# schema, but check each against its model page in the Proving Ground. A wrong
-# name fails fast with an error (no output, no charge on most endpoints).
+# Argument names are checked against series/lincoln/schemas.yaml (fal's live
+# schemas, 2026-11-24) by test_pipeline_arguments_match_schemas.
 #
 # estimate_usd is what the budget guard reserves before each call. Keep it at
 # or above the real price so the hard stop can't be passed.
@@ -22,7 +21,6 @@ steps:
     takes: 3
     arguments:
       prompt: "{prompt}"
-      negative_prompt: "{negative_prompt}"
       aspect_ratio: "1:1"
       seed: "{seed}"
       num_images: 1
@@ -41,7 +39,6 @@ steps:
     takes: 2
     arguments:
       prompt: "{prompt}"
-      negative_prompt: "{negative_prompt}"
       image_urls: "{image_urls}"
       aspect_ratio: "9:16"
       seed: "{seed}"
@@ -52,7 +49,6 @@ steps:
           prompt: "{prompt}"
           image_urls: "{image_urls}"
           image_size: portrait_16_9
-          seed: "{seed}"
 
   keyframe_no_refs:
     endpoint: google/nano-banana-2.1
@@ -60,21 +56,21 @@ steps:
     takes: 2
     arguments:
       prompt: "{prompt}"
-      negative_prompt: "{negative_prompt}"
       aspect_ratio: "9:16"
       seed: "{seed}"
       num_images: 1
 
   motion:
     endpoint: fal-ai/kling-video/v3/pro/image-to-video
-    estimate_usd: 1.20 # 10 s at $0.112/s, rounded up
+    estimate_usd: 1.70 # the 15 s maximum at $0.112/s, rounded up
     takes: 1
-    durations: [5, 10] # seconds the model accepts; the shortest that covers the shot is used
+    duration_range: [3, 15] # whole seconds; each shot asks for its own length
     arguments:
       prompt: "{prompt}"
       negative_prompt: "{negative_prompt}"
-      image_url: "{image_url}"
+      start_image_url: "{image_url}"
       duration: "{duration}"
+      cfg_scale: 0.5
       generate_audio: false
     fallbacks:
       - endpoint: minimax/h3-max/image-to-video
@@ -83,6 +79,7 @@ steps:
           image_url: "{image_url}"
           duration: "{duration}"
           resolution: 1080P
+          prompt_expansion_mode: disabled # otherwise it rewrites the prompt
 
   speech:
     endpoint: fal-ai/minimax/speech-2.8-hd
@@ -90,9 +87,10 @@ steps:
     takes: 2 # a second take only if the first fails the word check
     pause_token: "<#0.6#>" # replaces … so the ellipsis is a pause, never a word
     arguments:
-      text: "{text}"
+      prompt: "{text}"
       voice_setting:
         voice_id: "{voice_id}"
+      language_boost: English
       output_format: url
 
   transcribe:
@@ -115,6 +113,7 @@ steps:
     arguments:
       prompt: "{prompt}"
       music_length_ms: "{length_ms}"
+      force_instrumental: true
 
   sfx:
     endpoint: elevenlabs/sound-effects/v3

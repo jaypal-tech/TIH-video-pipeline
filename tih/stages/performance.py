@@ -31,13 +31,13 @@ def source_seconds(duration: float, speed: float, freeze_at: float | None) -> fl
     return moving * speed
 
 
-def model_duration(needed: float, allowed: list[int]) -> int:
-    if not allowed:
-        return math.ceil(needed)
-    fitting = [d for d in sorted(allowed) if d >= needed]
-    if not fitting:
-        raise ValueError(f"Shot needs {needed:.1f} s but the model allows at most {max(allowed)} s")
-    return fitting[0]
+def model_duration(needed: float, allowed: tuple[int, int] | None) -> int:
+    """Whole seconds to request: the shot's own length, inside the model's range."""
+    seconds = math.ceil(needed)
+    if allowed is None:
+        return seconds
+    low, high = allowed
+    return min(max(seconds, low), high)
 
 
 def run_motion(ctx: RunContext) -> None:
@@ -52,7 +52,7 @@ def run_motion(ctx: RunContext) -> None:
     for shot in plan.shots:
         image_url = upload_local(gateway, Path(keyframes[shot.id].chosen))
         seconds = model_duration(
-            source_seconds(shot.duration, shot.speed, shot.freeze_at), config.durations
+            source_seconds(shot.duration, shot.speed, shot.freeze_at), config.duration_range
         )
         takes = []
         for take in range(config.takes):

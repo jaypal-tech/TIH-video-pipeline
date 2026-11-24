@@ -165,10 +165,35 @@ def test_ellipsis_becomes_a_pause_not_a_word():
 def test_model_duration_covers_slow_motion_and_freeze():
     assert source_seconds(1.5, 0.5, None) == 0.75
     assert source_seconds(7.0, 1.0, 4.0) == 4.0
-    assert model_duration(4.0, [5, 10]) == 5
-    assert model_duration(7.0, [5, 10]) == 10
-    with pytest.raises(ValueError):
-        model_duration(12.0, [5, 10])
+    assert model_duration(4.0, (3, 15)) == 4
+    assert model_duration(7.0, (3, 15)) == 7
+
+
+def test_motion_seconds_clamped():
+    assert model_duration(1.5, (3, 15)) == 3
+    assert model_duration(4.2, (3, 15)) == 5
+    assert model_duration(20.0, (3, 15)) == 15
+
+
+def test_pipeline_arguments_match_schemas():
+    schemas = yaml.safe_load((ROOT / "series" / "lincoln" / "schemas.yaml").read_text(encoding="utf-8"))
+    pipeline = yaml.safe_load((ROOT / "series" / "lincoln" / "pipeline.yaml").read_text(encoding="utf-8"))
+    problems = []
+    for name, step in pipeline["steps"].items():
+        for endpoint, arguments in [(step["endpoint"], step["arguments"])] + [
+            (f["endpoint"], f["arguments"]) for f in step.get("fallbacks", [])
+        ]:
+            accepted = set(schemas.get(endpoint, []))
+            if not accepted:
+                problems.append(f"{name}: no schema for {endpoint}")
+                continue
+            for key, value in arguments.items():
+                if key not in accepted:
+                    problems.append(f"{name}: {endpoint} does not accept {key}")
+                if isinstance(value, dict):
+                    problems += [f"{name}: {endpoint} does not accept {key}.{sub}"
+                                 for sub in value if f"{key}.{sub}" not in accepted]
+    assert problems == []
 
 
 def test_series_budget_comes_from_config():

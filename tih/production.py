@@ -44,7 +44,7 @@ class StepConfig(BaseModel):
     takes: int = 1
     arguments: dict[str, Any]
     fallbacks: list[FallbackConfig] = Field(default_factory=list)
-    durations: list[int] = Field(default_factory=list)
+    duration_range: tuple[int, int] | None = None
     pause_token: str | None = None
 
 
