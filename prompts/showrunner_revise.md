@@ -8,7 +8,10 @@ Each finding has an ID, the check it failed, the episode, a quote from the plan 
 - **advice**: use your judgment. Act on it when it makes the season better. Decline it when the plan is stronger as it stands, and say why.
 - A finding marked RULE is a series rule the plan broke. Always fix it.
 
-Return one entry in `changes` for every finding: `fixed` with what you changed, or `declined` with your reason. Then return the full revised plan.
+You work in two steps, each asked for separately.
+
+1. **Decide.** Return one entry in `changes` for every finding: `fixed` with the change you will make, specific enough to carry out, or `declined` with your reason.
+2. **Revise.** You receive your own decisions. Return the full revised plan, carrying out every decision marked `fixed` and leaving declined findings alone.
 
 ## How to revise
 

@@ -16,11 +16,11 @@ from tih.stages.record import run_record
 from tih.stages.registry import RunContext
 from tih.story.critique import (
     Change,
+    ChangeList,
     Comparison,
     EndingLabel,
     EpisodeCritique,
     Finding,
-    Revision,
     SeasonCritique,
     TruthCritique,
 )
@@ -178,7 +178,8 @@ def run_replies(draft, revised, batch=10, true_story=True, findings=None, change
         replies.append(reply(TruthCritique(findings=[])))
     if changes is None:
         changes = [Change(finding="F1", action="fixed", note="New ending.")]
-    replies.append(reply(Revision(changes=changes, plan=revised)))
+    replies.append(reply(ChangeList(changes=changes)))
+    replies.append(reply(revised))
     return replies
 
 
@@ -227,6 +228,7 @@ def test_story_room_runs_every_step_and_writes_files(season, tmp_path, monkeypat
         "critic_episodes",
         "critic_season",
         "critic_truth",
+        "showrunner_changes",
         "showrunner_revise",
         "compare",
         "compare",
@@ -258,7 +260,8 @@ def test_each_step_sees_the_work_before_it(season, tmp_path, monkeypatch):
     assert "<source>" not in client.sent(4)
     assert "T1: Nothing stated" in client.sent(6) and "<source>" in client.sent(6)
     assert "F1" in client.sent(7) and "No threat is left hanging." in client.sent(7)
-    assert "<plan_a>" in client.sent(8) and "<plan_b>" in client.sent(8)
+    assert "New ending." in client.sent(8) and "<source>" in client.sent(8)
+    assert "<plan_a>" in client.sent(9) and "<plan_b>" in client.sent(9)
 
 
 def test_declined_hard_finding_is_shown_as_unresolved(season, tmp_path, monkeypatch):
@@ -291,8 +294,8 @@ def test_broken_revision_gets_one_repair_that_sees_the_plan(season, tmp_path, mo
     )
     use_client(monkeypatch, tmp_path, client)
     story_room.run_story_room(season)
-    assert "held_back_early" in client.sent(8)
-    assert "The stranger says her name, and she runs." in client.sent(8)
+    assert "held_back_early" in client.sent(9)
+    assert "The stranger says her name, and she runs." in client.sent(9)
     assert yaml.safe_load(read(season, "season_plan.yaml"))["episodes"][9]["reveals"] == []
 
 
@@ -347,7 +350,7 @@ def test_any_series_runs_from_its_own_folder(tmp_path, monkeypatch):
     page = (ctx.paths.stage_dir("story_room") / "season_plan.md").read_text("utf-8")
     assert page.startswith("# Harbor Lights, season plan")
     assert "Working title 2" in page
-    assert len(client.calls) == 7
+    assert len(client.calls) == 8
     assert "critic_truth" not in [r.settings["role"] for r in ledger.current()]
     for text in ("The keeper hides a letter.", "Quiet dread.", "End on the lamp going dark."):
         assert text in client.sent(0)

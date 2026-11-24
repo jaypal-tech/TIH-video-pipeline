@@ -99,9 +99,8 @@ class Change(BaseModel):
     note: str = Field(description="What changed, or why the plan stands.")
 
 
-class Revision(BaseModel):
+class ChangeList(BaseModel):
     changes: list[Change] = Field(description="One entry for every finding.")
-    plan: SeasonPlan
 
 
 class Comparison(BaseModel):

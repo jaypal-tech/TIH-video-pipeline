@@ -10,9 +10,9 @@ from tih.story.critique import (
     EPISODE_CHECKS,
     SEASON_CHECKS,
     TRUTH_CHECKS,
+    ChangeList,
     Comparison,
     EpisodeCritique,
-    Revision,
     SeasonCritique,
     TruthCritique,
     describe,
@@ -164,14 +164,25 @@ def run_story_room(ctx: RunContext) -> None:
         raw, episode_review.ending_labels, draft, check_season(draft, outline, config)
     )
 
+    revise_base = base + draft_block + _tag("findings", render_findings(findings))
     revision = ask_json(
+        llm,
+        "showrunner_changes",
+        _prompt("showrunner_revise"),
+        revise_base + "Decide what to do about every finding.",
+        ChangeList,
+    )
+    decisions = _yaml([change.model_dump(mode="json") for change in revision.changes])
+    revised = ask_json(
         llm,
         "showrunner_revise",
         _prompt("showrunner_revise"),
-        base + draft_block + _tag("findings", render_findings(findings)) + "Revise the plan.",
-        Revision,
+        revise_base
+        + _tag("decisions", decisions)
+        + "Return the full revised plan, carrying out every decision marked fixed.",
+        SeasonPlan,
     )
-    plan = fix_fields(revision.plan, titles, config)
+    plan = fix_fields(revised, titles, config)
     violations = check_season(plan, outline, config)
     if violations:
         problems = "\n".join(f"- {v.rule}: {v.detail}" for v in violations)
