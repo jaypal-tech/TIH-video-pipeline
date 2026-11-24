@@ -4,6 +4,7 @@ import typer
 
 from tih.gates import approve as approve_gate
 from tih.paths import RunPaths
+from tih.stages import historians_desk as _historians_desk  # noqa: F401  registers the stage
 from tih.stages import record as _record  # noqa: F401  registers the stage
 from tih.stages import story_room as _story_room  # noqa: F401  registers the stage
 from tih.stages import writers_room as _writers_room  # noqa: F401  registers the stage
