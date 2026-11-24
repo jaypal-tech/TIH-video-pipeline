@@ -1,0 +1,262 @@
+# Series bible: the only place a look, a voice or a place is described.
+# Every image, video and voice prompt is built from these blocks, so a
+# character looks and sounds the same in every shot of every episode.
+# Text comes from the brief's cast and location sheets (section 2) and the
+# Ep 1 production pack. Locked choices (chosen reference image, seed, voice
+# id) live in locks.yaml, written by `tih lock`, not here.
+
+style:
+  look: >-
+    photoreal historical drama, Washington DC April 1865, vertical 9:16
+    composition, gaslight amber and moon-blue palette, light haze, wet-plate
+    collodion vignette, fine 35mm film grain, muted color with red bunting as
+    the only saturated color, shallow depth of field, natural skin texture
+  negative: >-
+    modern clothing, modern buildings, electric light, wristwatch, zipper,
+    readable text, letters, signs, captions, watermark, logo, extra fingers,
+    deformed hands, saturated colors, plastic skin, cartoon
+  reference_sheet: >-
+    character reference sheet, {look}, front view, three-quarter view,
+    profile, full body, plain grey background, soft even light, photoreal,
+    1865 period accurate
+  lenses:
+    CU: 85
+    ECU: 85
+    MCU: 85
+    MEDIUM: 50
+    TWO: 50
+    INSERT: 85
+    POV: 50
+    WIDE: 28
+
+# How image and video prompts name real people. "appearance" sends only the
+# look text; "real_names" also sends the name. Set after the Proving Ground.
+naming_policy: appearance
+
+characters:
+  booth:
+    name: John Wilkes Booth
+    name_card: "JOHN WILKES BOOTH · America's matinee idol · 26"
+    episodes: [1, 2, 3, 4, 5]
+    look: >-
+      26-year-old man, 5'8" athletic build, pale skin, dark intense eyes,
+      jet-black curly hair, neat black mustache, black broadcloth frock coat,
+      white high collar, black silk cravat, black slouch hat, black kid gloves,
+      magnetic and controlled, not glamorous
+    must: [black mustache, black kid gloves]
+    voice: >-
+      trained stage voice, mid baritone, Maryland gentleman's diction,
+      controlled and musical; gets quieter, never louder, when he means it
+  powell:
+    name: Lewis Powell
+    name_card: "LEWIS POWELL · Confederate veteran · 20"
+    episodes: [1, 5]
+    look: >-
+      20-year-old man, 6'2", very broad heavy shoulders, heavy square jaw,
+      thick dark hair, flat unblinking stare, worn dark wool coat too tight
+      across the back, rough collarless shirt, wide-brimmed hat
+    voice: low and slow Deep South drawl, few words, no wasted breath
+  lincoln:
+    name: Abraham Lincoln
+    name_card: "ABRAHAM LINCOLN · President · 56"
+    episodes: [1, 2]
+    look: >-
+      man aged 56, 6'4", very tall and gaunt, deeply lined hollow-cheeked face,
+      coarse black hair, chin beard and no mustache, grey eyes, loose rumpled
+      black frock coat that looks slept in, narrow black bow tie, tired
+    must: [chin beard, no mustache]
+    voice: >-
+      high-pitched, thin, reedy carrying tenor with a Kentucky accent; never a
+      deep movie baritone; projecting outdoors, unhurried
+  tad:
+    name: Tad Lincoln
+    name_card: "TAD LINCOLN · his son · 12"
+    episodes: [1]
+    look: 12-year-old boy, small for his age, tousled hair, dark boy's jacket
+    voice: null # silent
+  grant:
+    name: Ulysses S. Grant
+    name_card: "ULYSSES S. GRANT · General-in-Chief · 42"
+    episodes: [2, 5]
+    look: >-
+      42-year-old man, 5'8", slightly stooped, short cropped brown beard, plain
+      dark-blue undress frock coat with shoulder straps and no sash, an unlit
+      cigar in his hand
+    must: [cigar unlit]
+    voice: quiet, flat Midwestern (Ohio) voice, short sentences, never raised
+  ford:
+    name: Harry Clay Ford
+    name_card: "HARRY FORD · Ford's Theatre, box office"
+    episodes: [2]
+    look: >-
+      young man about 20, clean-shaven, quick face, shirtsleeves, waistcoat,
+      sleeve garters
+    voice: bright Baltimore voice, a friend's teasing tone
+  mary_surratt:
+    name: Mary Surratt
+    name_card: "MARY SURRATT · boarding-house owner · 42"
+    episodes: [3]
+    designed_face: true # attributed photographs are disputed; never match one
+    look: >-
+      42-year-old woman, stout and upright, dark hair parted in the centre and
+      drawn back, grey eyes, plain black widow's dress with a small white
+      collar, a crucifix at the throat
+    voice: >-
+      low, measured Maryland alto; a churchgoer's composure that never cracks
+  weichmann:
+    name: Louis Weichmann
+    name_card: "LOUIS WEICHMANN · her boarder · 22"
+    episodes: [3]
+    look: >-
+      22-year-old man, round-faced, heavy-set, clerk's dark suit, a bowler,
+      gloves, eager to please
+    voice: quick, slightly nasal city clerk, raised in Philadelphia
+  lloyd:
+    name: John M. Lloyd
+    name_card: "JOHN LLOYD · tavern keeper, Surrattsville"
+    episodes: [3]
+    look: >-
+      man in his 40s, thick-set, ruddy face, rumpled country coat, collar
+      undone, unsteady with drink
+    voice: rough southern-Maryland country voice, a little slurred
+  clerk:
+    name: The desk clerk
+    name_card: "THE DESK CLERK · Kirkwood House"
+    episodes: [4]
+    look: man in his 30s, pomaded hair, black coat, a pen behind his ear
+    voice: polite, neutral hotel voice
+  atzerodt:
+    name: George Atzerodt
+    name_card: "GEORGE ATZERODT · carriage painter · 29"
+    episodes: [4, 5]
+    look: >-
+      29-year-old man, small and stooped, scruffy beard, shabby stained coat,
+      a crumpled hat, always holding a glass
+    voice: >-
+      German (Prussian) accent, nervous, the voice rising when he is
+      frightened
+  browning:
+    name: William A. Browning
+    name_card: "WILLIAM BROWNING · the Vice President's secretary"
+    episodes: [4]
+    look: neat man in his 30s, dark frock coat, a document case under his arm
+    voice: mild Tennessee upland accent, curious more than alarmed
+  matthews:
+    name: John Matthews
+    name_card: "JOHN MATTHEWS · actor, Booth's friend"
+    episodes: [5]
+    look: man in his 30s, an actor's face, clean-shaven, light overcoat, top hat
+    voice: null # silent in ep 5
+  julia_grant:
+    name: Julia Dent Grant
+    name_card: "JULIA GRANT · the General's wife · 39"
+    episodes: [5]
+    look: >-
+      39-year-old woman, small, dark center-parted hair, dark travelling dress
+      and bonnet, a slight cast in one eye, seen in three-quarter view
+    must: [three-quarter view]
+    voice: null # silent
+  herold:
+    name: David Herold
+    name_card: "DAVID HEROLD · druggist's clerk · 22"
+    episodes: [5]
+    look: >-
+      22-year-old man, boyish and slight, a wisp of a mustache, cheap short
+      jacket, checked trousers, a pocket watch
+    voice: null # silent in ep 5
+
+places:
+  L1:
+    name: White House north lawn, the crowd
+    look: >-
+      night, drizzle, White House north lawn packed with a crowd holding
+      umbrellas and torches, torch-amber light on faces, moon-blue rain, the
+      White House north front dark behind except one lit window above the
+      portico
+  L2:
+    name: The window above the north portico
+    look: >-
+      the window above the White House north portico, seen from slightly below
+      and outside, one candle held by a hand from frame left, loose manuscript
+      pages, warm candlelight against night rain
+  L3:
+    name: The President's office, White House
+    look: >-
+      late morning, tall windows, cold daylight, an unlit gas jet, a long
+      table with papers, chairs pushed back after a meeting
+  L4:
+    name: Ford's Theatre box office
+    look: >-
+      noon, a narrow wooden counter, pigeonholes of mail, a street door with
+      daylight behind it, a closed ledger on the counter
+  L5:
+    name: Ford's Theatre auditorium, empty
+    look: >-
+      noon, dust in one shaft of light from a high window, gas jets off, the
+      state box upper stage right with two empty chairs, no flags hung, a
+      stagehand far off sweeping the stage
+  L6:
+    name: The Surratt boarding-house parlor, H Street
+    look: >-
+      afternoon, a plain respectable parlor, a crucifix on the wall, lace
+      curtains, soft grey light, a hall doorway at frame right
+  L7:
+    name: A country road, Prince George's County, Maryland
+    look: >-
+      afternoon in early spring, bare fields, rutted mud, a split-rail fence,
+      a hired one-horse buggy
+  L8:
+    name: The Surratt tavern yard, Surrattsville
+    look: >-
+      about 5 pm, low sun, a two-storey clapboard tavern, a woodpile, a second
+      buggy pulling in
+  L9:
+    name: Kirkwood House lobby, front desk
+    look: >-
+      afternoon, a mahogany desk, a pigeonhole rack behind it, a brass bell, a
+      tray of blank cards and a pen, gas jets lit low against a dim afternoon
+  L10:
+    name: A small upstairs room, Kirkwood House
+    look: >-
+      afternoon, curtains half drawn, a thin bar of daylight, an iron bed, a
+      washstand, a bottle and a glass
+  L11:
+    name: Pennsylvania Avenue
+    look: >-
+      about 4 pm, low spring sun, a wide unpaved avenue, horse traffic, a plank
+      sidewalk
+  L12:
+    name: A rented room, Herndon House
+    look: >-
+      8 pm, one candle on the washstand and nothing else, a narrow room, a map
+      of Washington spread on the bed with lines visible and no readable
+      words, a hat on the bedpost
+
+props:
+  gloves: Booth's black kid gloves, which he takes off and puts on
+  candle_pages: a single candle and loose handwritten pages, writing unreadable
+  pocket_watch: a brass pocket watch
+
+# Recurring sounds and images that tie episodes together.
+motifs:
+  gloves: Booth takes his gloves off when he decides and puts them on when he commits.
+  watch_tick: The pocket-watch tick starts when the plan moves closer.
+
+# Words that must never appear in an image or video prompt for a given
+# episode (period and payoff guards). Checked when prompts are built.
+forbidden:
+  all: [gunshot, muzzle flash, knife, blade, blood, wound, wristwatch, electric light]
+  by_episode:
+    2: [flags on the box]
+
+# One look for every overlay, so episodes match on screen.
+overlays:
+  # Caladea (SIL OFL 1.1) ships in fonts/ so every machine renders the same.
+  font: fonts/Caladea-Regular.ttf
+  font_bold: fonts/Caladea-Bold.ttf
+  font_italic: fonts/Caladea-Italic.ttf
+  caption_size: 54
+  tag_size: 30
+  name_card_size: 34
+  card_size: 58
+  caption_y: 1380 # above the app's bottom controls, inside the 900x1400 safe area
