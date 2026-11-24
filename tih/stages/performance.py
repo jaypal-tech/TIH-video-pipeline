@@ -9,7 +9,7 @@ import math
 from pathlib import Path
 
 from tih.assets import ShotRef
-from tih.bible import load_bible
+from tih.bible import Locks, load_bible, load_locks, require_look
 from tih.briefs import motion_brief
 from tih.gates import require_approved
 from tih.production import (
@@ -23,7 +23,8 @@ from tih.production import (
     take_from,
     write_takes,
 )
-from tih.providers.fal import upload_local
+from tih.providers.fal import GatewayContext, upload_local
+from tih.shots import ResolvedShot
 from tih.stages.registry import RunContext, Stage, register
 
 
@@ -42,12 +43,24 @@ def model_duration(needed: float, allowed: tuple[int, int] | None) -> int:
     return min(max(seconds, low), high)
 
 
+def motion_elements(gateway: GatewayContext, locks: Locks, shot: ResolvedShot) -> list[dict] | None:
+    """Each cast member's locked look as a Kling element, in cast order; None with no cast."""
+    if not shot.cast:
+        return None
+    elements = []
+    for character in shot.cast:
+        url = upload_local(gateway, Path(require_look(locks, character).reference))
+        elements.append({"frontal_image_url": url, "reference_image_urls": [url]})
+    return elements
+
+
 def run_motion(ctx: RunContext) -> None:
     require_approved(ctx.paths, "script")
     require_approved(ctx.paths, "look")
     plan = load_resolved(ctx)
     keyframes = read_takes(ctx, "keyframes")
     bible = load_bible(ctx.paths.series)
+    locks = load_locks(ctx.paths.series)
     config = load_pipeline(ctx.paths.series).steps["motion"]
     gateway = gateway_for(ctx)
 
@@ -66,6 +79,7 @@ def run_motion(ctx: RunContext) -> None:
                 {
                     **motion_brief(shot, bible),
                     "image_url": image_url,
+                    "elements": motion_elements(gateway, locks, shot),
                     "duration": str(seconds),
                 },
                 ShotRef(plan.episode, shot.clip, shot.id),

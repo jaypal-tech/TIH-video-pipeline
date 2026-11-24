@@ -116,16 +116,24 @@ def _mouth(shot: ResolvedShot, bible: Bible) -> str:
     return ""
 
 
-def motion_brief(shot: ResolvedShot, bible: Bible) -> dict[str, str]:
-    movement = _sentence(_describe(shot.motion, bible, {}))
+def _motion_body(shot: ResolvedShot, bible: Bible, labels: dict[str, str], lead: str) -> str:
+    movement = _sentence(_describe(shot.motion, bible, labels))
     weather = _sentence(shot.scene.weather) if shot.scene is not None else ""
-    body = " ".join(
-        part for part in (movement, weather, _mouth(shot, bible), "Real-time speed, one continuous take.") if part
-    )
+    ending = "Real-time speed, one continuous take."
+    return " ".join(part for part in (lead, movement, weather, _mouth(shot, bible), ending) if part)
+
+
+def motion_brief(shot: ResolvedShot, bible: Bible) -> dict[str, str]:
+    """Kling gets each cast member as @ElementN, in cast order, matching the elements it is sent."""
+    elements = {cid: f"@Element{n}" for n, cid in enumerate(shot.cast, start=1)}
+    lead = ""
+    if shot.cast:
+        lead = " ".join(f"{elements[c]} is the {role(bible.characters[c])}." for c in shot.cast)
+    plain = _motion_body(shot, bible, {}, "")
     moves = any(word in shot.motion.lower() for word in CAMERA_MOVES)
     return {
-        "prompt_kling": body,
-        "prompt_hailuo": body if moves else f"[Static shot] {body}",
+        "prompt_kling": _motion_body(shot, bible, elements, lead),
+        "prompt_hailuo": plain if moves else f"[Static shot] {plain}",
         "negative_video": bible.style.video_negative,
     }
 

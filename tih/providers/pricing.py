@@ -45,6 +45,8 @@ def read_cost(
     if "rates" in entry:
         value = arguments.get(entry["tier_key"])
         rate = entry["rates"].get(str(value).lower() if isinstance(value, bool) else str(value))
+    if rate is not None and arguments.get("elements"):
+        rate *= entry.get("elements_multiplier", 1.0)
 
     seconds = _duration_seconds(arguments)
     text = arguments.get("text") or arguments.get("prompt")

@@ -22,6 +22,7 @@ endpoints:
     unit: seconds
     tier_key: generate_audio # voice control ($0.196/s) is not used
     rates: { "false": 0.112, "true": 0.168 }
+    elements_multiplier: 2.0 # binding characters as elements doubles the per-second rate
   minimax/h3-max/image-to-video:
     unit: seconds
     tier_key: resolution

@@ -73,13 +73,14 @@ steps:
 
   motion:
     endpoint: fal-ai/kling-video/v3/pro/image-to-video
-    estimate_usd: 1.70 # the 15 s maximum at $0.112/s, rounded up
+    estimate_usd: 3.40 # the 15 s maximum at $0.112/s, doubled with elements, rounded up
     takes: 1
     duration_range: [3, 15] # whole seconds; each shot asks for its own length
     arguments:
       prompt: "{prompt_kling}"
       negative_prompt: "{negative_video}"
       start_image_url: "{image_url}"
+      elements: "{elements}" # each cast member's locked look, bound so the face holds in motion
       duration: "{duration}"
       cfg_scale: 0.5
       generate_audio: false

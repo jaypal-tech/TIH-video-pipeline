@@ -12,12 +12,14 @@ from tih.ledger import Ledger
 from tih.paths import RunPaths
 from tih.production import load_resolved
 from tih.providers.dry import DryRunTransport
-from tih.providers.fal import GatewayContext
+from tih.providers.fal import GatewayContext, upload_local
+from tih.providers.pricing import read_cost
 from tih.shots import PlanError, continuity_notes, resolve_plan
 from tih.stages import camera as _camera  # noqa: F401  registers the stage
 from tih.stages import plates as _plates  # noqa: F401  registers the stage
 from tih.stages import record as _record  # noqa: F401  registers the stage
 from tih.stages import shotplan as _shotplan  # noqa: F401  registers the stage
+from tih.stages.performance import motion_elements
 from tih.stages.registry import RunContext, run_stage
 
 ROOT = Path(__file__).parents[1]
@@ -138,3 +140,37 @@ def test_keyframe_brief_states_sides_light_weather(episode_one):
     assert "the 20-year-old man from image 2 stands screen-right" in prompt
     assert shot.scene.light in prompt and shot.scene.weather in prompt
     assert shot.scene.weather in motion_brief(shot, bible)["prompt_kling"]
+
+
+KLING = "fal-ai/kling-video/v3/pro/image-to-video"
+
+
+def test_elements_double_price():
+    models = ROOT / "series" / "lincoln" / "models.yaml"
+    plain, _ = read_cost(models, KLING, {"duration": "3", "generate_audio": False}, None, 9.0)
+    bound, _ = read_cost(models, KLING, {"duration": "3", "generate_audio": False,
+                                         "elements": [{"frontal_image_url": "u"}]}, None, 9.0)
+    assert plain == pytest.approx(3 * 0.112)
+    assert bound == pytest.approx(3 * 0.112 * 2)
+
+
+def test_motion_passes_elements_in_cast_order(dry, tmp_path, episode_one):
+    ctx, _ = dry
+    bible = load_bible("lincoln")
+    looks = {c: _image(tmp_path / f"{c}.png") for c in ("booth", "powell")}
+    locks = Locks(characters={c: CharacterLock(reference=str(p), reference_sha256=file_sha256(p)) for c, p in looks.items()})
+    plan = resolve_plan(_plan_with(lambda p: None), episode_one, bible)
+    two = next(s for s in plan.shots if s.id == "1.6")
+    elements = motion_elements(ctx.gateway, locks, two)
+    assert [e["frontal_image_url"] for e in elements] == [upload_local(ctx.gateway, looks[c]) for c in two.cast]
+    assert elements[0]["reference_image_urls"] == [elements[0]["frontal_image_url"]]
+    prompt = motion_brief(two, bible)["prompt_kling"]
+    assert "@Element1" in prompt and "@Element2" in prompt
+    assert "@Element" not in motion_brief(two, bible)["prompt_hailuo"]
+
+
+def test_no_elements_without_cast(dry, episode_one):
+    ctx, _ = dry
+    plan = resolve_plan(_plan_with(lambda p: None), episode_one, load_bible("lincoln"))
+    empty = next(s for s in plan.shots if s.id == "1.2")
+    assert motion_elements(ctx.gateway, Locks(), empty) is None
