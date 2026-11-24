@@ -11,6 +11,7 @@ GATES: dict[str, tuple[str, ...]] = {
         "story_room/season_ledger.yaml",
         "story_room/bible.yaml",
     ),
+    "script": ("writers_room/script.yaml",),
 }
 
 
