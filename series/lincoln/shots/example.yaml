@@ -14,6 +14,28 @@
 episode: 1
 fps: 24
 
+# One rule per clip: screen sides hold for the whole clip (the 180-degree rule).
+scenes:
+  - clip: 1
+    sides: {booth: left, powell: right}
+    light: Torchlight from screen-left, cool moonlight from above
+    weather: Steady light drizzle, wet ground
+  - clip: 2
+    sides: {booth: left, lincoln: center, tad: right}
+    light: Torchlight from screen-left, cool moonlight from above
+    weather: Steady light drizzle, wet ground
+  - clip: 3
+    sides: {booth: left, powell: right}
+    light: Torchlight from screen-left, cool moonlight from above
+    weather: Steady light drizzle, wet ground
+  - clip: 4
+    sides: {booth: left, lincoln: center}
+    light: Torchlight from screen-left, cool moonlight from above
+    weather: Steady light drizzle, wet ground
+  - clip: 5
+    sides: {booth: left, powell: right, lincoln: center}
+    light: Torchlight from screen-left, cool moonlight from above
+    weather: Steady light drizzle, wet ground
 shots:
   - id: "1.1"
     beat: e1c1b1
@@ -273,10 +295,10 @@ shots:
   - id: "5.3"
     beat: e1c5b2
     duration: 1.5
-    size: MCU
+    size: CU
     cast: [booth]
     place: L1
-    keyframe: 85mm medium close-up of [BOOTH] in [L1] beginning to turn away from the window
+    keyframe: 85mm close-up of [BOOTH] in [L1] beginning to turn away from the window
     motion: He turns his back on the window, slow and deliberate
     speed: 0.5
     sound: music cuts to rain only

@@ -23,6 +23,15 @@ You receive the series config, the series bible (characters, places, props, moti
 - `delivery: face` only when the speaker's face is on screen and speaking in that shot; that shot gets lip-sync. A `face` shot shows exactly one face: its `cast` is the speaker alone. Anyone else is off frame, a back to camera, or a soft shoulder with no face, and is not in `cast`. Otherwise use `off` (heard, not seen) or `inner` (a thought), matching the script line's delivery where it says `off` or `inner`.
 - Give a line enough time to be spoken: about 2.5 words per second, plus a beat.
 
+## Continuity: one film, not separate clips
+
+- Write `scenes`: one rule per clip with `sides` (every cast member in that clip is `left`, `center` or `right`), the `light` (its direction and source) and the `weather`. These are repeated into every shot, so the room, light and rain hold.
+- Keep the sides for the whole clip (the 180-degree rule). Only cross them with a move you write into `motion`.
+- Never cut between two shots with the same size and the same cast: that is a jump cut. Change size or angle, or cut to the listener.
+- Cut to the listener's reaction; don't hold more than 4 shots in a row on one face.
+- Open a new place on a WIDE or MEDIUM within its first 2 shots, so we know where we are.
+- Every shot runs 1.0 to 8.0 seconds.
+
 ## Pace for a phone
 
 - The first 3 seconds hook: a face, a line, a threat.

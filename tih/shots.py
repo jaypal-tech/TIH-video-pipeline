@@ -61,11 +61,29 @@ class Cue(BaseModel):
     prompt: str
 
 
+Side = Literal["left", "center", "right"]
+SHOT_SECONDS = (1.0, 8.0)
+OPENING_SIZES = ("WIDE", "MEDIUM")
+MAX_SAME_FACE_RUN = 4
+
+
+class SceneRule(BaseModel):
+    """What holds for a whole clip: who stands where on screen, the light, the weather."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    clip: int
+    sides: dict[str, Side]
+    light: str
+    weather: str
+
+
 class ShotPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     episode: int
     fps: Literal[24, 30] = 24
+    scenes: list[SceneRule] = Field(default_factory=list)
     shots: list[PlannedShot]
     cues: list[Cue] = Field(default_factory=list)
 
@@ -78,6 +96,7 @@ class ResolvedShot(PlannedShot):
     evidence: Evidence | None = None
     evidence_label: str | None = None
     needs_lipsync: bool = False
+    scene: SceneRule | None = None
     direction: str = ""  # the script line's acting direction; sets speech speed and emotion
     keyframe_prompt: str
     negative_prompt: str
@@ -88,6 +107,7 @@ class ResolvedPlan(BaseModel):
     episode: int
     fps: int
     runtime_s: float
+    scenes: list[SceneRule] = Field(default_factory=list)
     shots: list[ResolvedShot]
     cues: list[Cue]
 
@@ -139,6 +159,9 @@ def resolve_plan(
     resolved: list[ResolvedShot] = []
     start = 0.0
     seen_ids: set[str] = set()
+    rules = {rule.clip: rule for rule in plan.scenes}
+    side_errors: set[str] = set()
+    previous: PlannedShot | None = None
 
     for shot in plan.shots:
         where = f"shot {shot.id}"
@@ -150,6 +173,20 @@ def resolve_plan(
             continue
         clip_number, beat = beats[shot.beat]
         covered.add(beat.id)
+        rule = rules.get(clip_number)
+        if rule is None:
+            side_errors.add(f"clip {clip_number} has no scene rule")
+        else:
+            side_errors.update(
+                f"{c} has no side in clip {clip_number}" for c in shot.cast if c not in rule.sides
+            )
+        low_s, high_s = SHOT_SECONDS
+        if not low_s <= shot.duration <= high_s:
+            errors.append(f"{where} is {shot.duration} s; shots run {low_s}-{high_s} s")
+        if (previous is not None and shot.cast and previous.size == shot.size
+                and sorted(previous.cast) == sorted(shot.cast)):
+            errors.append(f"shots {previous.id} and {shot.id} are a jump cut (same size and cast)")
+        previous = shot
         if order[beat.id] < last_order:
             errors.append(f"{where}: beat {beat.id} is out of order")
         last_order = max(last_order, order[beat.id])
@@ -211,6 +248,7 @@ def resolve_plan(
                 evidence=evidence,
                 evidence_label=label,
                 needs_lipsync=shot.line is not None and shot.delivery == Delivery.face,
+                scene=rule,
                 direction=direction,
                 keyframe_prompt=keyframe,
                 negative_prompt=bible.style.negative,
@@ -219,6 +257,7 @@ def resolve_plan(
         )
         start += shot.duration
 
+    errors += sorted(side_errors)
     for beat_id in beats:
         if beat_id not in covered:
             errors.append(f"beat {beat_id} has no shot")
@@ -242,9 +281,35 @@ def resolve_plan(
         episode=plan.episode,
         fps=plan.fps,
         runtime_s=runtime,
+        scenes=plan.scenes,
         shots=resolved,
         cues=plan.cues,
     )
+
+
+def continuity_notes(plan: ResolvedPlan) -> list[str]:
+    """Coverage advice the Director should weigh; not errors."""
+    notes = []
+    opened: set[tuple[int, str]] = set()
+    for index, shot in enumerate(plan.shots):
+        if (shot.clip, shot.place) in opened:
+            continue
+        opened.add((shot.clip, shot.place))
+        first = [s for s in plan.shots[index:] if s.clip == shot.clip and s.place == shot.place][:2]
+        if not any(s.size in OPENING_SIZES for s in first):
+            notes.append(
+                f"clip {shot.clip}: {shot.place} opens on {', '.join(s.size for s in first)}; "
+                f"open a place on a WIDE or MEDIUM within its first 2 shots"
+            )
+    run: list[ResolvedShot] = []
+    for shot in plan.shots + [None]:
+        if shot is not None and len(shot.cast) == 1 and run and run[-1].cast == shot.cast:
+            run.append(shot)
+            continue
+        if len(run) > MAX_SAME_FACE_RUN:
+            notes.append(f"shots {run[0].id}-{run[-1].id}: {len(run)} shots in a row on {run[0].cast[0]}; cut to a reaction")
+        run = [shot] if shot is not None and len(shot.cast) == 1 else []
+    return notes
 
 
 def render_plan(plan: ResolvedPlan) -> str:
@@ -263,4 +328,6 @@ def render_plan(plan: ResolvedPlan) -> str:
         f"{len(plan.shots)} shots, {plan.runtime_s:.1f} s, {lipsync} lip-sync shots, "
         f"{len(plan.cues)} sound cues.\n\n"
     )
-    return head + "\n".join(rows) + "\n"
+    notes = continuity_notes(plan)
+    tail = "\n## Continuity notes\n\n" + "\n".join(f"- {note}" for note in notes) + "\n" if notes else ""
+    return head + "\n".join(rows) + "\n" + tail

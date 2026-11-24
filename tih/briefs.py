@@ -72,6 +72,11 @@ def _keyframe_prompt(shot: ResolvedShot, bible: Bible, word: str, has_plate: boo
             keep = "keep their faces, hair and costumes exactly as in the references"
         parts.append(f"Using {who}, {keep}.")
     parts.append(_sentence(_describe(shot.keyframe, bible, labels)))
+    if shot.scene is not None:
+        if shot.cast:
+            sides = ", ".join(f"{labels[c]} stands screen-{shot.scene.sides[c]}" for c in shot.cast)
+            parts.append(f"Screen positions: {sides}.")
+        parts += [_sentence(shot.scene.light), _sentence(shot.scene.weather)]
     if has_plate:
         plate = len(shot.cast) + 1
         parts.append(
@@ -113,7 +118,10 @@ def _mouth(shot: ResolvedShot, bible: Bible) -> str:
 
 def motion_brief(shot: ResolvedShot, bible: Bible) -> dict[str, str]:
     movement = _sentence(_describe(shot.motion, bible, {}))
-    body = " ".join(part for part in (movement, _mouth(shot, bible), "Real-time speed, one continuous take.") if part)
+    weather = _sentence(shot.scene.weather) if shot.scene is not None else ""
+    body = " ".join(
+        part for part in (movement, weather, _mouth(shot, bible), "Real-time speed, one continuous take.") if part
+    )
     moves = any(word in shot.motion.lower() for word in CAMERA_MOVES)
     return {
         "prompt_kling": body,
