@@ -1,43 +1,51 @@
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import yaml
+from pydantic import BaseModel
 
 from tih.llm import LlmContext, ask_json
 from tih.series import SeriesConfig, load_series
 from tih.stages.registry import RunContext, Stage, register
 from tih.story.critique import (
     EPISODE_CHECKS,
+    RULE_CHECK,
     SEASON_CHECKS,
     TRUTH_CHECKS,
-    ChangeList,
-    Comparison,
+    Change,
     EpisodeCritique,
+    EpisodeRewrite,
+    Recheck,
+    ReviewedFinding,
     SeasonCritique,
+    SeasonRewrite,
     TruthCritique,
+    check_text,
     describe,
+    flagged,
     render_changes,
     render_checks,
     render_critique,
     render_findings,
     review_findings,
-    unresolved,
 )
 from tih.story.models import OutlineEntry
 from tih.story.season import (
     EpisodeBatch,
+    EpisodePlan,
     SeasonPlan,
     SeasonSpine,
     assemble_plan,
     check_season,
     ending_repeats,
     fix_fields,
+    merge_rewrite,
     render_season_plan,
 )
 
 PROMPTS = Path(__file__).parents[2] / "prompts"
-Draft = Callable[[LlmContext, SeriesConfig, str, list[OutlineEntry]], SeasonPlan]
+SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 
 class StoryRoomFailed(RuntimeError):
@@ -60,38 +68,37 @@ def _plan_tag(name: str, plan: SeasonPlan) -> str:
     return _tag(name, _yaml(plan.model_dump(mode="json")))
 
 
-def _compare(llm: LlmContext, config_block: str, draft: SeasonPlan, revised: SeasonPlan) -> str:
-    votes = []
-    for take, (first, second, names) in enumerate(
-        (
-            (draft, revised, {"A": "draft", "B": "revision"}),
-            (revised, draft, {"A": "revision", "B": "draft"}),
-        )
-    ):
-        user = (
-            config_block
-            + _plan_tag("plan_a", first)
-            + _plan_tag("plan_b", second)
-            + "Which plan is the stronger season?"
-        )
-        result = ask_json(llm, "compare", _prompt("compare"), user, Comparison, take=take)
-        votes.append(names.get(result.better, "tie"))
-    return votes[0] if votes[0] == votes[1] else "neither clearly"
+def _ask_numbered(
+    llm: LlmContext,
+    role: str,
+    system: str,
+    user: str,
+    schema: type[SchemaT],
+    numbers: Callable[[SchemaT], list[int]],
+    expected: list[int],
+    what: str,
+) -> SchemaT:
+    """Ask once, and once more if the reply covers the wrong episodes."""
+    for take in range(2):
+        result = ask_json(llm, role, system, user, schema, take=take)
+        if numbers(result) == expected:
+            return result
+    raise StoryRoomFailed(f"{what} came back twice with the wrong episodes")
 
 
-def _draft_staged(
+def _draft(
     llm: LlmContext, config: SeriesConfig, base: str, outline: list[OutlineEntry]
 ) -> SeasonPlan:
-    spine = ask_json(
+    spine = _ask_numbered(
         llm,
         "showrunner_spine",
         _prompt("showrunner_spine"),
         base + f"Plan the spine of the full {config.episodes}-episode season.",
         SeasonSpine,
+        lambda result: [ending.number for ending in result.endings],
+        list(range(1, config.episodes + 1)),
+        f"The spine for episodes 1 to {config.episodes}",
     )
-    expected = list(range(1, config.episodes + 1))
-    if [ending.number for ending in spine.endings] != expected:
-        raise StoryRoomFailed(f"The spine must list endings for episodes 1 to {config.episodes}")
     spine_block = _tag("season_spine", _yaml(spine.model_dump(mode="json")))
 
     details = []
@@ -102,61 +109,44 @@ def _draft_staged(
             written = _tag(
                 "episodes_written_so_far", _yaml([d.model_dump(mode="json") for d in details])
             )
-        batch = ask_json(
+        batch = _ask_numbered(
             llm,
             "showrunner_episodes",
             _prompt("showrunner_episodes"),
             base + spine_block + written + f"Write episodes {first} to {last}.",
             EpisodeBatch,
+            lambda result: [episode.number for episode in result.episodes],
+            list(range(first, last + 1)),
+            f"The batch for episodes {first} to {last}",
         )
-        if [episode.number for episode in batch.episodes] != list(range(first, last + 1)):
-            raise StoryRoomFailed(
-                f"The batch for episodes {first} to {last} came back with the wrong episodes"
-            )
         details += batch.episodes
     return assemble_plan(spine, details, outline, config)
 
 
-def _draft_single(
-    llm: LlmContext, config: SeriesConfig, base: str, outline: list[OutlineEntry]
-) -> SeasonPlan:
-    plan = ask_json(
-        llm,
-        "showrunner_single",
-        _prompt("showrunner_spine") + "\n" + _prompt("showrunner_episodes"),
-        base
-        + f"Plan the full {config.episodes}-episode season in one pass. You are given the "
-        "guidance for both passes above, and you do both here: work through the spine in "
-        "your head, then return the complete plan with every episode in full detail. "
-        "There are no separate tentpole_endings or endings fields: each episode's turn "
-        "and cliff carry them.",
-        SeasonPlan,
-    )
-    return fix_fields(plan, {entry.number: entry.title for entry in outline}, config)
+def _where(finding: ReviewedFinding) -> str:
+    return f"ep {finding.episode}" if finding.episode else "season"
 
 
 def run_story_room(ctx: RunContext) -> None:
-    _run(ctx, "story_room", _draft_staged)
+    llm = LlmContext.for_run(ctx.paths)
+    try:
+        _run(ctx, llm)
+    finally:
+        llm.ledger.export_csv(llm.ledger.path.with_name("calls.csv"))
 
 
-def run_story_room_single(ctx: RunContext) -> None:
-    _run(ctx, "story_room_single", _draft_single)
-
-
-def _run(ctx: RunContext, stage: str, make_draft: Draft) -> None:
+def _run(ctx: RunContext, llm: LlmContext) -> None:
     series_dir = Path("series") / ctx.paths.series
     config = load_series(ctx.paths.series)
     source = (series_dir / "source" / "brief.txt").read_text(encoding="utf-8")
     record_dir = ctx.paths.stage_dir("record")
     entries = yaml.safe_load((record_dir / "season_outline.yaml").read_text("utf-8"))
     outline = [OutlineEntry(**entry) for entry in entries]
-    llm = LlmContext.for_run(ctx.paths)
 
     config_block = _tag("series_config", _yaml(config.model_dump(mode="json")))
-    source_block = _tag("source", source)
-    base = config_block + source_block
+    base = config_block + _tag("source", source)
 
-    draft = make_draft(llm, config, base, outline)
+    draft = _draft(llm, config, base, outline)
     titles = {episode.number: episode.title for episode in draft.episodes}
     draft_block = _plan_tag("season_plan", draft)
 
@@ -195,35 +185,59 @@ def _run(ctx: RunContext, stage: str, make_draft: Draft) -> None:
         )
         raw += truth_review.findings
     findings, dropped = review_findings(
-        raw, episode_review.ending_labels, draft, check_season(draft, outline, config)
+        raw,
+        episode_review.ending_labels,
+        draft,
+        check_season(draft, outline, config),
+        titles={entry.title for entry in outline},
     )
 
-    revise_base = base + draft_block + _tag("findings", render_findings(findings))
-    revision = ask_json(
-        llm,
-        "showrunner_changes",
-        _prompt("showrunner_revise"),
-        revise_base + "Decide what to do about every finding.",
-        ChangeList,
-    )
-    decisions = _yaml([change.model_dump(mode="json") for change in revision.changes])
-    revised = ask_json(
-        llm,
-        "showrunner_revise",
-        _prompt("showrunner_revise"),
-        revise_base
-        + _tag("decisions", decisions)
-        + "Return the full revised plan, carrying out every decision marked fixed.",
-        SeasonPlan,
-    )
-    plan = fix_fields(revised, titles, config)
+    hard = [finding for finding in findings if finding.hard]
+    episode_hard = [finding for finding in hard if finding.episode]
+    season_hard = [finding for finding in hard if not finding.episode]
+    touched = sorted({finding.episode for finding in episode_hard})
+    revise = _prompt("showrunner_revise")
+    changes: list[Change] = []
+    rewritten: list[EpisodePlan] = []
+    season_fields = None
+    if episode_hard:
+        listed = ", ".join(str(number) for number in touched)
+        episode_fix = ask_json(
+            llm,
+            "showrunner_fix_episodes",
+            revise,
+            base
+            + draft_block
+            + _tag("findings", render_findings(episode_hard))
+            + f"Rewrite episodes {listed}. Return a change for every finding, "
+            "then only those episodes, in full.",
+            EpisodeRewrite,
+        )
+        changes += episode_fix.changes
+        rewritten = episode_fix.episodes
+    if season_hard:
+        season_fix = ask_json(
+            llm,
+            "showrunner_fix_season",
+            revise,
+            base
+            + draft_block
+            + _tag("findings", render_findings(season_hard))
+            + "Fix the season-level fields. Return a change for every finding, "
+            "then every season-level field in full.",
+            SeasonRewrite,
+        )
+        changes += season_fix.changes
+        season_fields = season_fix.season.model_dump(mode="json")
+
+    plan = fix_fields(merge_rewrite(draft, rewritten, set(touched), season_fields), titles, config)
     violations = check_season(plan, outline, config)
     if violations:
         problems = "\n".join(f"- {v.rule}: {v.detail}" for v in violations)
         repaired = ask_json(
             llm,
             "showrunner_repair",
-            _prompt("showrunner_revise"),
+            revise,
             base
             + _plan_tag("season_plan", plan)
             + _tag("rule_violations", problems)
@@ -236,11 +250,38 @@ def _run(ctx: RunContext, stage: str, make_draft: Draft) -> None:
             problems = "\n".join(f"- {v.rule}: {v.detail}" for v in violations)
             raise StoryRoomFailed(f"Season plan still breaks series rules:\n{problems}")
 
-    comparison = _compare(llm, config_block, draft, plan)
-    open_items = [describe(finding) for finding in unresolved(findings, revision.changes)]
+    decided = {change.finding: change for change in changes}
+    to_check = [
+        finding
+        for finding in hard
+        if finding.check != RULE_CHECK
+        and finding.id in decided
+        and decided[finding.id].action == "fixed"
+    ]
+    recheck = Recheck(results=[])
+    if to_check:
+        listing = "\n".join(
+            f"{finding.id} ({finding.check}, {_where(finding)}): {check_text(finding.check)}\n"
+            f"  Problem found: {finding.problem}\n"
+            f"  Fix made: {decided[finding.id].note}"
+            for finding in to_check
+        )
+        recheck = ask_json(
+            llm,
+            "critic_recheck",
+            critic,
+            base
+            + _plan_tag("season_plan", plan)
+            + _tag("recheck", listing)
+            + "Re-check each finding against the revised plan.",
+            Recheck,
+        )
+    open_items = [
+        f"{describe(finding)} ({why})" for finding, why in flagged(findings, changes, recheck)
+    ]
 
     data = plan.model_dump(mode="json")
-    stage_dir = ctx.paths.stage_dir(stage)
+    stage_dir = ctx.paths.stage_dir("story_room")
     (stage_dir / "season_plan.md").write_text(
         render_season_plan(plan, config.title, open_items), encoding="utf-8"
     )
@@ -264,17 +305,13 @@ def _run(ctx: RunContext, stage: str, make_draft: Draft) -> None:
             dropped,
             season_review.verdict,
             season_review.top_fixes,
-            comparison,
             ending_repeats(draft),
         ),
         encoding="utf-8",
     )
     (stage_dir / "changes.md").write_text(
-        render_changes(findings, revision.changes), encoding="utf-8"
+        render_changes(findings, changes, recheck), encoding="utf-8"
     )
 
 
 register(Stage(name="story_room", requires=("record",), gate=None, run=run_story_room))
-register(
-    Stage(name="story_room_single", requires=("record",), gate=None, run=run_story_room_single)
-)

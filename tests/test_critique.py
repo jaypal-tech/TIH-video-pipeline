@@ -4,11 +4,17 @@ from tih.story.critique import (
     Change,
     EndingLabel,
     Finding,
+    Recheck,
+    RecheckResult,
+    check_text,
+    flagged,
+    render_changes,
     render_checks,
     render_critique,
     review_findings,
-    unresolved,
 )
+
+from tih.story.season import Violation
 
 from test_season import valid_plan
 
@@ -68,13 +74,49 @@ def test_ending_that_opens_a_question_passes():
     assert review(labels=[EndingLabel(number=2, label="opens_question")]) == ([], 0)
 
 
-def test_unresolved_is_every_hard_finding_not_marked_fixed():
-    kept, _ = review(finding("E5", 1), finding("E5", 2), finding("E5", 3), finding("E6", 4))
+def result(finding, verdict):
+    return RecheckResult(finding=finding, quote="q", reason="Because.", verdict=verdict)
+
+
+def test_flagged_is_every_hard_finding_not_fixed_and_rechecked():
+    kept, _ = review(finding("E5", 1), finding("E5", 2), finding("E5", 3), finding("E5", 5), finding("E6", 4))
     changes = [
         Change(finding="F1", action="fixed", note="Rewrote."),
         Change(finding="F2", action="declined", note="It works."),
+        Change(finding="F4", action="fixed", note="Rewrote."),
     ]
-    assert [f.id for f in unresolved(kept, changes)] == ["F2", "F3"]
+    rechecked = Recheck(results=[result("F1", "pass"), result("F4", "fail")])
+    assert [(f.id, why) for f, why in flagged(kept, changes, rechecked)] == [
+        ("F2", "declined: It works."),
+        ("F3", "not addressed"),
+        ("F4", "re-check fail: Because."),
+    ]
+
+
+def test_fixed_rule_finding_needs_no_critic_recheck():
+    kept, _ = review_findings([], [], valid_plan(), [Violation("wall", "Ep 5 must have wall 'early'")])
+    changes = [Change(finding="F1", action="fixed", note="Moved.")]
+    assert flagged(kept, changes, Recheck(results=[])) == []
+
+
+def test_finding_quoting_only_a_title_is_dropped():
+    title = finding("E10", 2, quote="the box")
+    kept, dropped = review_findings([title], [], valid_plan(), titles={"The Box"})
+    assert (kept, dropped) == ([], 1)
+
+
+def test_check_text_covers_labels_and_rules():
+    assert check_text("E5").startswith("The ending leaves")
+    assert "opens a question" in check_text("E4")
+    assert check_text("RULE") == "A series rule from the config."
+
+
+def test_changes_page_shows_decision_and_recheck():
+    kept, _ = review(finding("E5", 3))
+    page = render_changes(
+        kept, [Change(finding="F1", action="fixed", note="New ending.")], Recheck(results=[result("F1", "pass")])
+    )
+    assert "**fixed**: New ending." in page and "re-check: **pass**" in page
 
 
 def test_checks_are_rendered_with_their_ids():
@@ -85,10 +127,7 @@ def test_checks_are_rendered_with_their_ids():
 
 def test_critique_page_shows_verdict_table_and_findings():
     kept, dropped = review(finding("E5", 3), finding(quote="not there"))
-    page = render_critique(
-        valid_plan(), kept, dropped, "consider", ["Fix episode 3."], "revision", 0
-    )
+    page = render_critique(valid_plan(), kept, dropped, "consider", ["Fix episode 3."], 0)
     assert "Overall verdict: **consider**" in page
     assert "| 3 | E5 |" in page
     assert "1 finding dropped" in page
-    assert "Blind comparison: **revision**" in page

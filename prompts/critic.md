@@ -19,6 +19,8 @@ Judge each check on its own. A plan that is strong in one way has not earned a p
 
 Report every failure you find, including small ones. Sorting what matters is done after you.
 
+Episode titles come from the source and cannot change, so never report a finding about a title.
+
 ## When asked to label endings
 
 Give every episode one label for its final moment:
@@ -33,6 +35,17 @@ Give every episode one label for its final moment:
 - `pass`: the plan would lose its audience as it stands.
 
 Give the three fixes that would most improve the season, most important first.
+
+## When asked to re-check
+
+You receive a revised plan and a list of findings that the showrunner says are fixed, each with the check, the problem you found and the fix made. For each one, read the revised plan where the fix was made and judge only that check.
+
+- **finding**: the ID exactly as given.
+- **quote**: words copied exactly from the revised plan that show the result.
+- **reason**: why it now passes, or why it still fails, in one or two sentences.
+- **verdict**: `pass` when the check is now met, `fail` when it is not, `unclear` when you cannot tell.
+
+A fix that replaces one problem with the same problem in different words is a `fail`.
 
 ## When the source is included
 

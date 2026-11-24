@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -112,6 +112,22 @@ class EpisodePlan(EpisodeDetail):
     wall: Wall
 
 
+class SeasonFields(BaseModel):
+    """Every season-level field of a plan, without the episodes."""
+
+    season_question: str
+    theme: str
+    promise: str
+    phases: list[Phase]
+    arcs: list[Arc]
+    setups: list[Setup]
+    knowledge: list[KnowledgeEvent]
+    held_back: list[HeldMoment]
+    motifs: list[Motif]
+    open_questions: list[str]
+    risks: list[str]
+
+
 class SeasonPlan(BaseModel):
     season_question: str
     theme: str
@@ -157,6 +173,26 @@ def assemble_plan(
     data = spine.model_dump(exclude={"tentpole_endings", "endings"})
     plan = SeasonPlan(**data, episodes=episodes)
     return fix_fields(plan, {entry.number: entry.title for entry in outline}, config)
+
+
+def merge_rewrite(
+    plan: SeasonPlan,
+    episodes: list[EpisodePlan],
+    touched: set[int],
+    season: dict[str, Any] | None,
+) -> SeasonPlan:
+    """Return a copy of the plan with only the touched episodes, and the season fields if given, replaced."""
+    rewritten = {episode.number: episode for episode in episodes if episode.number in touched}
+    data = plan.model_dump(mode="json")
+    if season is not None:
+        data.update(season)
+    data["episodes"] = [
+        rewritten[episode.number].model_dump(mode="json")
+        if episode.number in rewritten
+        else episode.model_dump(mode="json")
+        for episode in plan.episodes
+    ]
+    return SeasonPlan.model_validate(data)
 
 
 def ending_repeats(plan: SeasonPlan) -> int:

@@ -17,6 +17,7 @@ from tih.story.season import (
     check_season,
     ending_repeats,
     fix_fields,
+    merge_rewrite,
     render_season_plan,
 )
 
@@ -220,3 +221,21 @@ def test_ending_repeats_counts_same_type_twice_in_a_row():
     assert ending_repeats(plan) == 0
     plan.episodes[1].cliff_type = plan.episodes[0].cliff_type
     assert ending_repeats(plan) == 1
+
+
+def test_merge_replaces_only_the_touched_episodes():
+    plan = valid_plan()
+    changed = plan.episodes[2].model_copy(update={"cliff": "New."})
+    other = plan.episodes[4].model_copy(update={"cliff": "Not asked for."})
+    merged = merge_rewrite(plan, [changed, other], {3}, None)
+    assert merged.episodes[2].cliff == "New."
+    assert merged.episodes[4] == valid_plan().episodes[4]
+    assert plan.episodes[2].cliff == valid_plan().episodes[2].cliff
+
+
+def test_merge_replaces_season_fields_when_given():
+    plan = valid_plan()
+    season = plan.model_dump(exclude={"episodes"})
+    season["promise"] = "New promise."
+    merged = merge_rewrite(plan, [], set(), season)
+    assert merged.promise == "New promise." and merged.episodes == plan.episodes
