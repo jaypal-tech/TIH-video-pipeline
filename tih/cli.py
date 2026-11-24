@@ -110,8 +110,9 @@ def rehearse_episode(number: int, series: str, root: Path, source: Path = Path("
     )
     ctx = RunContext(paths=paths, gateway=gateway)
     approve_gate(paths, "script")
-    run_stage(ctx, "shotplan")
-    run_stage(ctx, "casting")
+    # force: a new script or plan copied in must replace the last rehearsal; reused takes cost $0
+    run_stage(ctx, "shotplan", force=True)
+    run_stage(ctx, "casting", force=True)
     locks = load_locks(series)
     for key, takes in read_takes(ctx, "casting").items():
         kind, character = key.split(":")
@@ -125,7 +126,7 @@ def rehearse_episode(number: int, series: str, root: Path, source: Path = Path("
     save_locks(series, locks)
     approve_gate(paths, "look")
     for stage in EPISODE_STAGES[2:]:
-        run_stage(ctx, stage)
+        run_stage(ctx, stage, force=True)
     return ctx
 
 

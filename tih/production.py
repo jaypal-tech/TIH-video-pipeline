@@ -20,10 +20,13 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from tih.assets import ShotRef
+from tih.bible import load_bible
 from tih.ledger import Ledger
 from tih.providers.fal import GatewayContext, GenerationResult, generate
-from tih.shots import ResolvedPlan
+from tih.series import load_series
+from tih.shots import PlanError, ResolvedPlan, load_plan, plan_path, resolve_plan
 from tih.stages.registry import RunContext
+from tih.story.models import Episode
 
 
 class FallbackConfig(BaseModel):
@@ -105,8 +108,28 @@ def gateway_for(ctx: RunContext) -> GatewayContext:
 
 
 def load_resolved(ctx: RunContext) -> ResolvedPlan:
-    path = ctx.paths.scope_dir / "shotplan" / "shots.yaml"
-    return ResolvedPlan.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    """The resolved plan, re-checked against the current Director plan and script.
+
+    Resolving is free, so every paid stage re-resolves; a plan or script that
+    changed since `shotplan` ran stops the stage instead of paying for old shots.
+    """
+    scope = ctx.paths.scope_dir
+    stored = ResolvedPlan.model_validate(
+        yaml.safe_load((scope / "shotplan" / "shots.yaml").read_text(encoding="utf-8"))
+    )
+    script = Episode.model_validate(
+        yaml.safe_load((scope / "writers_room" / "script.yaml").read_text(encoding="utf-8"))
+    )
+    current = resolve_plan(
+        load_plan(plan_path(ctx.paths)), script, load_bible(ctx.paths.series),
+        load_series(ctx.paths.series).runtime_s,
+    )
+    if current.model_dump(mode="json") != stored.model_dump(mode="json"):
+        raise PlanError(
+            "The shot plan or script changed since shotplan ran; re-run shotplan "
+            f"(tih run {ctx.paths.episode} --stage shotplan --series {ctx.paths.series} --force)"
+        )
+    return current
 
 
 def call_step(

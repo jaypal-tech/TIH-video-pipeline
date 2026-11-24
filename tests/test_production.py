@@ -19,7 +19,7 @@ from tih.gates import ArtifactChanged, GateNotApproved, approve, require_approve
 from tih.ledger import Ledger
 from tih.media.ffmpeg import validate_master
 from tih.paths import RunPaths
-from tih.production import read_takes, render_arguments
+from tih.production import load_resolved, read_takes, render_arguments
 from tih.providers.dry import DryRunTransport
 from tih.providers.fal import GatewayContext, generate
 from tih.assets import ShotRef
@@ -295,3 +295,81 @@ def test_look_lock_covers_director_plan(tmp_path, monkeypatch):
 def test_plan_runtime_uses_series_range(episode_one):
     with pytest.raises(PlanError, match="outside 80-90"):
         resolve_plan(load_plan(example_plan_path("lincoln")), episode_one, load_bible("lincoln"), runtime_s=(80, 90))
+
+
+def test_paid_stage_refuses_stale_shotplan(tmp_path):
+    ctx = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path))
+    run_stage(ctx, "record")
+    _staged(ctx)
+    run_stage(ctx, "shotplan")
+    load_resolved(ctx)
+    plan = plan_path(ctx.paths)
+    data = yaml.safe_load(plan.read_text(encoding="utf-8"))
+    data["shots"][0]["duration"] = 3.0
+    plan.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    with pytest.raises(PlanError, match="re-run shotplan"):
+        load_resolved(ctx)
+
+
+def test_plan_episode_must_match_script(episode_one):
+    def edit(plan):
+        plan.episode = 2
+
+    with pytest.raises(PlanError, match="episode 2"):
+        resolve_plan(_plan_with(edit), episode_one, load_bible("lincoln"))
+
+
+def test_every_beat_needs_a_shot(episode_one):
+    def edit(plan):
+        plan.shots = [s for s in plan.shots if s.beat != "e1c2b3"]
+
+    with pytest.raises(PlanError, match="e1c2b3 has no shot"):
+        resolve_plan(_plan_with(edit), episode_one, load_bible("lincoln"))
+
+
+def test_beats_in_script_order(episode_one):
+    def edit(plan):
+        plan.shots[0], plan.shots[2] = plan.shots[2], plan.shots[0]
+
+    with pytest.raises(PlanError, match="out of order"):
+        resolve_plan(_plan_with(edit), episode_one, load_bible("lincoln"))
+
+
+def test_overlay_must_sit_on_its_beat(episode_one):
+    def edit(plan):
+        plan.shots[2].overlays.append(plan.shots[0].overlays.pop(0))
+
+    with pytest.raises(PlanError, match="not on beat"):
+        resolve_plan(_plan_with(edit), episode_one, load_bible("lincoln"))
+
+
+def test_sound_needs_look_lock(tmp_path, monkeypatch):
+    monkeypatch.setenv("TIH_LOCKS_FILE", str(tmp_path / "locks.yaml"))
+    paths = RunPaths("lincoln", 1, root=tmp_path)
+    ledger = Ledger(tmp_path / "lincoln" / "calls.jsonl")
+    gateway = GatewayContext(paths, ledger, BudgetGuard(ledger), DryRunTransport(tmp_path / "dry"),
+                             ROOT / "series" / "lincoln" / "models.yaml")
+    ctx = RunContext(paths=paths, gateway=gateway)
+    run_stage(ctx, "record")
+    _staged(ctx)
+    run_stage(ctx, "shotplan")
+    approve(paths, "script")
+    with pytest.raises(GateNotApproved):
+        run_stage(ctx, "sound")
+    assert ledger.current() == []
+
+
+@pytest.mark.slow
+def test_second_rehearsal_uses_new_plan(tmp_path):
+    source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
+    run_stage(source, "record")
+    _staged(source)
+    root = tmp_path / "dry"
+    rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
+    plan = plan_path(source.paths)
+    data = yaml.safe_load(plan.read_text(encoding="utf-8"))
+    data["shots"][0]["duration"] = 3.0
+    plan.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
+    edl = yaml.safe_load((ctx.paths.scope_dir / "cut" / "edl.yaml").read_text(encoding="utf-8"))
+    assert edl[0]["duration"] == 3.0

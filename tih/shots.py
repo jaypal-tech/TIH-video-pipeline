@@ -125,7 +125,12 @@ def resolve_plan(
 ) -> ResolvedPlan:
     """Check the plan against the script and bible; return ready-to-run shots."""
     errors: list[str] = []
+    if plan.episode != episode.number:
+        errors.append(f"plan is for episode {plan.episode}, script is episode {episode.number}")
     beats = {beat.id: (clip.number, beat) for clip in episode.clips for beat in clip.beats}
+    order = {beat_id: index for index, beat_id in enumerate(beats)}
+    covered: set[str] = set()
+    last_order = -1
     script_overlays = {
         overlay.text for _, beat in beats.values() for overlay in beat.overlays
     }
@@ -143,6 +148,10 @@ def resolve_plan(
             errors.append(f"{where}: unknown beat {shot.beat}")
             continue
         clip_number, beat = beats[shot.beat]
+        covered.add(beat.id)
+        if order[beat.id] < last_order:
+            errors.append(f"{where}: beat {beat.id} is out of order")
+        last_order = max(last_order, order[beat.id])
         if shot.size not in bible.style.lenses:
             errors.append(f"{where}: no lens for size {shot.size}")
         if shot.place not in bible.places:
@@ -157,9 +166,12 @@ def resolve_plan(
         for character_id in shot.cast:
             if character_id not in named:
                 errors.append(f"{where}: {character_id} is cast but not named in the keyframe")
+        beat_overlays = {overlay.text for overlay in beat.overlays}
         for overlay in shot.overlays:
             if overlay.text not in script_overlays:
                 errors.append(f"{where}: overlay text is not in the script: {overlay.text}")
+            elif overlay.text not in beat_overlays:
+                errors.append(f"{where}: overlay is not on beat {beat.id}: {overlay.text}")
 
         speaker = evidence = label = None
         if shot.line is not None:
@@ -178,7 +190,7 @@ def resolve_plan(
         try:
             keyframe = expand(f"{shot.keyframe}, [STYLE]", bible)
             motion = expand(shot.motion, bible)
-            check_forbidden(f"{shot.keyframe} {shot.motion}", bible, plan.episode)
+            check_forbidden(f"{shot.keyframe} {shot.motion}", bible, episode.number)
         except (KeyError, ValueError) as error:
             errors.append(f"{where}: {error}")
             continue
@@ -200,6 +212,9 @@ def resolve_plan(
         )
         start += shot.duration
 
+    for beat_id in beats:
+        if beat_id not in covered:
+            errors.append(f"beat {beat_id} has no shot")
     for beat_id, (_, beat) in beats.items():
         if beat.line is None:
             continue

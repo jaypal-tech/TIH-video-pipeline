@@ -25,6 +25,7 @@ SFX_MAX_SECONDS = 22.0
 
 def run_sound(ctx: RunContext) -> None:
     require_approved(ctx.paths, "script")
+    require_approved(ctx.paths, "look")
     plan = load_resolved(ctx)
     steps = load_pipeline(ctx.paths.series).steps
     gateway = gateway_for(ctx)
@@ -50,4 +51,4 @@ def run_sound(ctx: RunContext) -> None:
     write_takes(ctx.paths.stage_dir("sound"), sets)
 
 
-register(Stage(name="sound", requires=("shotplan",), gate="script", run=run_sound))
+register(Stage(name="sound", requires=("shotplan",), gate="look", run=run_sound))
