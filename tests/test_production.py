@@ -448,5 +448,6 @@ def test_line_voiced_once_and_sliced_per_shot(tmp_path):
     piece = duration(ctx.paths.scope_dir / "lipsync" / "audio" / "4.1.wav")
     assert 0 < piece < whole
     placed = {path.stem: at for path, at in line_pieces(ctx, plan, tmp_path / "pieces")}
-    for shot_id in ("4.1", "4.2"):
-        assert placed[shot_id] == next(s.start_s for s in plan.shots if s.id == shot_id)
+    start = {s.id: s.start_s for s in plan.shots}
+    assert placed["4.2"] == start["4.2"]  # later pieces sit exactly on their own shot
+    assert 0 <= start["4.1"] - placed["4.1"] <= 0.25  # a line's first piece may lead its shot (J-cut)

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from tih.bible import load_bible
+from tih.bible import Bible, Grade, load_bible
 from tih.media import ffmpeg
 from tih.media.overlays import filters as overlay_filters
 from tih.production import load_resolved, read_takes
@@ -43,6 +43,38 @@ def _picture(ctx: RunContext, plan, work: Path) -> tuple[Path, list[dict]]:
     picture = work / "picture.mp4"
     ffmpeg.concat(parts, picture)
     return picture, edl
+
+
+AMBIENCE_FADE = 0.5  # seconds; each scene's bed fades in and runs this far into the next
+
+
+def grade_filters(grade: Grade) -> list[str]:
+    filters = [f"eq={grade.eq}"] if grade.eq else []
+    if grade.grain > 0:
+        filters.append(f"noise=alls={grade.grain}:allf=t")
+    return filters
+
+
+def video_chain(plan, bible: Bible, text_dir: Path) -> list[str]:
+    """Grade first, so captions and cards stay clean, then text, flashes, pixel format."""
+    chain = grade_filters(bible.style.grade) + overlay_filters(plan, bible.overlays, text_dir)
+    for shot in plan.shots:
+        if shot.flash_at is not None:
+            chain.append(f"fade=t=out:st={shot.start_s + shot.flash_at:.3f}:d={FLASH_SECONDS}:color=white")
+    chain.append("format=yuv420p")
+    return chain
+
+
+def ambience_track(source: Path, length: float, target: Path) -> Path:
+    """A scene's bed: the generated loop repeated to `length`, faded in and out."""
+    fade = min(AMBIENCE_FADE, length / 4)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    ffmpeg.run([
+        "ffmpeg", "-y", "-v", "error", "-stream_loop", "-1", "-i", str(source), "-t", f"{length:.3f}",
+        "-af", f"afade=t=in:d={fade:.3f},afade=t=out:st={length - fade:.3f}:d={fade:.3f}",
+        "-ar", str(SAMPLE_RATE), str(target),
+    ])
+    return target
 
 
 def _mix_inputs(inputs: list[tuple[Path, float, float | None, float]], runtime: float, target: Path) -> None:
@@ -84,7 +116,14 @@ def _sound(ctx: RunContext, plan, work: Path) -> tuple[Path, ffmpeg.Loudness | N
     else:
         raw_dialogue.replace(dialogue)
 
-    cues = [(Path(sound[c.id].chosen), c.at, c.duration, c.gain_db) for c in plan.cues]
+    cues = []
+    for c in plan.cues:
+        if c.kind == "ambience":
+            length = min(c.duration + AMBIENCE_FADE, plan.runtime_s - c.at)
+            bed_file = ambience_track(Path(sound[c.id].chosen), length, work / "ambience" / f"{c.id}.wav")
+            cues.append((bed_file, c.at, None, c.gain_db))
+        else:
+            cues.append((Path(sound[c.id].chosen), c.at, c.duration, c.gain_db))
     bed = work / "bed.wav"
     _mix_inputs(cues, plan.runtime_s, bed)
 
@@ -107,11 +146,7 @@ def run_cut(ctx: RunContext) -> None:
     picture, edl = _picture(ctx, plan, work)
     mix, loudness = _sound(ctx, plan, work)
 
-    chain = overlay_filters(plan, bible.overlays, work / "text")
-    flashes = [s.start_s + s.flash_at for s in plan.shots if s.flash_at is not None]
-    for at in flashes:
-        chain.append(f"fade=t=out:st={at:.3f}:d={FLASH_SECONDS}:color=white")
-    chain.append("format=yuv420p")
+    chain = video_chain(plan, bible, work / "text")
     filter_script = work / "video_filters.txt"
     filter_script.write_text(",\n".join(chain), encoding="utf-8")
 

@@ -25,7 +25,7 @@ from tih.production import (
 )
 from tih.providers.fal import upload_local
 from tih.stages.registry import RunContext, Stage, register
-from tih.stages.voice import line_shots, piece_audio
+from tih.stages.voice import beat_leads, line_shots, piece_audio
 
 
 def _minutes(path: Path) -> float | None:
@@ -44,6 +44,7 @@ def run_lipsync(ctx: RunContext) -> None:
     config = load_pipeline(ctx.paths.series).steps["lipsync"]
     gateway = gateway_for(ctx)
     by_beat = line_shots(plan)
+    leads = beat_leads(ctx, plan)
     audio_dir = ctx.paths.stage_dir("lipsync") / "audio"
 
     sets: dict[str, TakeSet] = {}
@@ -54,7 +55,9 @@ def run_lipsync(ctx: RunContext) -> None:
         shots = by_beat[shot.beat]
         pieces = [s.line for s in shots]
         index = [s.id for s in shots].index(shot.id)
-        audio = piece_audio(Path(voice[shot.beat].chosen), pieces, index, audio_dir / f"{shot.id}.wav")
+        # a J-cut line is already `lead` seconds in when its first shot appears
+        skip = leads[shot.beat] if index == 0 else 0.0
+        audio = piece_audio(Path(voice[shot.beat].chosen), pieces, index, audio_dir / f"{shot.id}.wav", skip)
         result = call_step(
             gateway,
             config,

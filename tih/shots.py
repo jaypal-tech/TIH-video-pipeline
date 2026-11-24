@@ -54,11 +54,12 @@ class Cue(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
-    kind: Literal["music", "sfx"]
+    kind: Literal["music", "sfx", "ambience"]
     at: float
     duration: float
     gain_db: float = -18.0
     prompt: str
+    scene: int | None = None  # ambience only: the clip whose bed this is
 
 
 Side = Literal["left", "center", "right"]
@@ -258,6 +259,13 @@ def resolve_plan(
         start += shot.duration
 
     errors += sorted(side_errors)
+    bedded = {cue.scene for cue in plan.cues if cue.kind == "ambience"}
+    for cue in plan.cues:
+        if cue.kind == "ambience" and cue.scene is None:
+            errors.append(f"cue {cue.id}: an ambience cue needs its clip as scene")
+    for clip_number in dict.fromkeys(beats[s.beat][0] for s in plan.shots if s.beat in beats):
+        if clip_number not in bedded:
+            errors.append(f"clip {clip_number} has no ambience")
     for beat_id in beats:
         if beat_id not in covered:
             errors.append(f"beat {beat_id} has no shot")

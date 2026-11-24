@@ -1,10 +1,14 @@
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
 from test_production import _plan_with, _staged, episode_one  # noqa: F401  episode_one is a fixture
 
-from tih.bible import CharacterLock, Locks, NotLocked, PlaceLock, file_sha256, load_bible, save_locks
+from tih.cli import rehearse_episode
+
+from tih.bible import CharacterLock, Grade, Locks, NotLocked, PlaceLock, file_sha256, load_bible, save_locks
 from tih.briefs import keyframe_brief, motion_brief
 from tih.budget import BudgetGuard
 from tih.gates import approve
@@ -19,7 +23,9 @@ from tih.stages import camera as _camera  # noqa: F401  registers the stage
 from tih.stages import plates as _plates  # noqa: F401  registers the stage
 from tih.stages import record as _record  # noqa: F401  registers the stage
 from tih.stages import shotplan as _shotplan  # noqa: F401  registers the stage
+from tih.stages.cut import ambience_track, grade_filters, video_chain
 from tih.stages.performance import motion_elements
+from tih.stages.voice import dialogue_starts
 from tih.stages.registry import RunContext, run_stage
 
 ROOT = Path(__file__).parents[1]
@@ -174,3 +180,78 @@ def test_no_elements_without_cast(dry, episode_one):
     plan = resolve_plan(_plan_with(lambda p: None), episode_one, load_bible("lincoln"))
     empty = next(s for s in plan.shots if s.id == "1.2")
     assert motion_elements(ctx.gateway, Locks(), empty) is None
+
+
+def test_grade_filters_before_text(episode_one, tmp_path):
+    bible = load_bible("lincoln")
+    assert grade_filters(Grade(eq="contrast=1.05", grain=6)) == ["eq=contrast=1.05", "noise=alls=6:allf=t"]
+    assert grade_filters(Grade()) == []
+    plan = resolve_plan(_plan_with(lambda p: None), episode_one, bible)
+    chain = video_chain(plan, bible, tmp_path / "text")
+    first_text = next(i for i, f in enumerate(chain) if f.startswith("drawtext"))
+    assert chain.index(f"eq={bible.style.grade.eq}") < first_text
+
+
+def _two_lines(episode_one, edit=lambda p: None):
+    plan = resolve_plan(_plan_with(edit), episode_one, load_bible("lincoln"))
+    beats = [s.beat for s in plan.shots if s.line]
+    return plan, list(dict.fromkeys(beats))
+
+
+def test_jcut_lead_applied_after_silent_shot(episode_one):
+    plan, beats = _two_lines(episode_one)
+    shot = next(s for s in plan.shots if s.id == "2.3")  # Lincoln's first line, after a silent insert
+    starts = dialogue_starts(plan, {b: 0.0 for b in beats})
+    assert starts[shot.beat] == pytest.approx(shot.start_s - 0.25)
+    first = plan.shots[0]
+    assert starts[first.beat] == first.start_s  # nothing before the first shot
+
+
+def test_jcut_lead_never_overlaps(episode_one):
+    plan, beats = _two_lines(episode_one)
+    shot = next(s for s in plan.shots if s.id == "2.3")
+    before = beats[beats.index(shot.beat) - 1]
+    ends = {b: 0.0 for b in beats}
+    ends[before] = shot.start_s - 0.1
+    assert dialogue_starts(plan, ends)[shot.beat] == pytest.approx(shot.start_s - 0.1)
+    ends[before] = shot.start_s + 0.3
+    assert dialogue_starts(plan, ends)[shot.beat] == pytest.approx(shot.start_s)
+
+
+def _mean_db(path, start, length):
+    out = subprocess.run(["ffmpeg", "-v", "info", "-ss", str(start), "-t", str(length), "-i", str(path),
+                          "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+    return float(out.split("mean_volume:")[1].split("dB")[0])
+
+
+def test_ambience_loops_to_span(tmp_path):
+    source = tmp_path / "rain.wav"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anoisesrc=d=2:a=0.3", str(source)], check=True)
+    bed = ambience_track(source, 40.0, tmp_path / "bed.wav")
+    assert 39.9 < float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                                       str(bed)], capture_output=True, text=True).stdout) < 40.1
+    assert _mean_db(bed, 35, 1) > -40
+
+
+def test_clip_needs_ambience(episode_one):
+    def edit(plan):
+        plan.cues = [c for c in plan.cues if not (c.kind == "ambience" and c.scene == 3)]
+
+    with pytest.raises(PlanError, match="clip 3 has no ambience"):
+        resolve_plan(_plan_with(edit), episode_one, load_bible("lincoln"))
+
+
+@pytest.mark.slow
+def test_all_parts_conformed(tmp_path, monkeypatch):
+    monkeypatch.chdir(ROOT)
+    source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
+    run_stage(source, "record")
+    _staged(source)
+    ctx = rehearse_episode(1, "lincoln", tmp_path / "dry", source=tmp_path / "src")
+    for part in sorted((ctx.paths.scope_dir / "cut" / "work" / "shots").glob("*.mp4")):
+        probe = json.loads(subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+             "stream=width,height,r_frame_rate,pix_fmt,sample_aspect_ratio", "-of", "json", str(part)],
+            capture_output=True, text=True).stdout)["streams"][0]
+        assert (probe["width"], probe["height"], probe["r_frame_rate"], probe["pix_fmt"]) == (1080, 1920, "24/1", "yuv420p"), part
+        assert probe.get("sample_aspect_ratio", "1:1") == "1:1", part

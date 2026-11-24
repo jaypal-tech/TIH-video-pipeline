@@ -18,6 +18,15 @@ from pydantic import BaseModel, ConfigDict, Field
 TOKEN = re.compile(r"\[([A-Za-z0-9_]+)\]")
 
 
+class Grade(BaseModel):
+    """One look over the whole cut: an ffmpeg eq chain and a film-grain strength."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    eq: str = ""
+    grain: int = 0
+
+
 class Style(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -28,6 +37,7 @@ class Style(BaseModel):
     clean: str = ""  # positive "keep the frame clean" text; image models ignore negatives
     video_negative: str = ""
     sound_period: str = ""
+    grade: Grade = Field(default_factory=Grade)
 
 
 class Character(BaseModel):

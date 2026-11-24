@@ -35,8 +35,10 @@ def run_sound(ctx: RunContext) -> None:
 
     sets: dict[str, TakeSet] = {}
     for cue in plan.cues:
-        config = steps[cue.kind]
+        # ambience is a looping sound effect, repeated to its scene's length in the cut
+        config = steps["sfx"] if cue.kind == "ambience" else steps[cue.kind]
         values = {
+            "loop": True if cue.kind == "ambience" else None,
             "prompt": cue_brief(cue, bible),
             "length_ms": int(math.ceil(cue.duration * 1000)),
             "duration_seconds": min(max(cue.duration, 0.5), SFX_MAX_SECONDS),

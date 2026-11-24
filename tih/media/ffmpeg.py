@@ -72,6 +72,7 @@ def render_shot(
         f"setpts=PTS/{speed}",
         f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase",
         f"crop={WIDTH}:{HEIGHT}",
+        "setsar=1",
         f"fps={fps}",
         f"trim=duration={moving:.3f}",
         "setpts=PTS-STARTPTS",

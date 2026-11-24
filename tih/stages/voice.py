@@ -33,6 +33,7 @@ from tih.providers.fal import upload_local
 from tih.shots import ResolvedPlan, ResolvedShot
 from tih.stages.registry import RunContext, Stage, register
 
+J_CUT_LEAD = 0.25  # seconds a line may start before its first shot
 WORD = re.compile(r"[a-z0-9]+(?:'[a-z0-9]+)*")
 
 
@@ -88,10 +89,11 @@ def slice_for_shot(timings: list[dict], pieces: list[str], index: int) -> tuple[
     return start, None
 
 
-def piece_audio(line: Path, pieces: list[str], index: int, out: Path) -> Path:
-    """One shot's words, cut from the whole-line take."""
+def piece_audio(line: Path, pieces: list[str], index: int, out: Path, skip: float = 0.0) -> Path:
+    """One shot's words, cut from the whole-line take, starting `skip` seconds later."""
     timings = json.loads(word_timings_path(line).read_text(encoding="utf-8"))
     start, end = slice_for_shot(timings, pieces, index)
+    start += skip
     out.parent.mkdir(parents=True, exist_ok=True)
     until = [] if end is None else ["-to", f"{end:.3f}"]
     ffmpeg.run(["ffmpeg", "-y", "-v", "error", "-i", str(line), "-ss", f"{start:.3f}", *until, str(out)])
@@ -107,15 +109,60 @@ def line_shots(plan: ResolvedPlan) -> dict[str, list[ResolvedShot]]:
     return by_beat
 
 
-def line_pieces(ctx: RunContext, plan: ResolvedPlan, out_dir: Path) -> list[tuple[Path, float]]:
-    """Every shot's piece of its line, and where it starts: the shot's own start."""
+def dialogue_starts(plan: ResolvedPlan, ends: dict[str, float], lead: float = J_CUT_LEAD) -> dict[str, float]:
+    """When each line's audio starts: up to `lead` before its first shot (a J-cut).
+
+    The lead applies when the shot before has no line or another speaker, and
+    never starts a line before the previous line's audio (`ends`) has finished.
+    """
+    starts: dict[str, float] = {}
+    previous_end = 0.0
+    index = {shot.id: i for i, shot in enumerate(plan.shots)}
+    for beat, shots in line_shots(plan).items():
+        first = shots[0]
+        start = first.start_s
+        at = index[first.id]
+        if at > 0:
+            before = plan.shots[at - 1]
+            if before.line is None or before.speaker != first.speaker:
+                start = min(first.start_s, max(first.start_s - lead, previous_end))
+        starts[beat] = round(start, 3)
+        previous_end = ends.get(beat, first.start_s)
+    return starts
+
+
+def beat_leads(ctx: RunContext, plan: ResolvedPlan) -> dict[str, float]:
+    """How many seconds each line's audio runs ahead of its first shot."""
     voice = read_takes(ctx, "voice")
+    ends = {}
+    for beat, shots in line_shots(plan).items():
+        take = Path(voice[beat].chosen)
+        timings = json.loads(word_timings_path(take).read_text(encoding="utf-8"))
+        pieces = [shot.line for shot in shots]
+        length = ffmpeg.duration(take)
+        ends[beat] = max(
+            shot.start_s + ((end if end is not None else length) - start)
+            for shot, (start, end) in ((s, slice_for_shot(timings, pieces, i)) for i, s in enumerate(shots))
+        )
+    starts = dialogue_starts(plan, ends)
+    return {beat: round(shots[0].start_s - starts[beat], 3) for beat, shots in line_shots(plan).items()}
+
+
+def line_pieces(ctx: RunContext, plan: ResolvedPlan, out_dir: Path) -> list[tuple[Path, float]]:
+    """Every shot's piece of its line, and where it starts on the soundtrack.
+
+    Each piece starts at its own shot, except a line's first piece, which may
+    start a little earlier (a J-cut); lip-sync cuts that lead off the face's
+    audio, so lips and soundtrack still share one clock.
+    """
+    voice = read_takes(ctx, "voice")
+    leads = beat_leads(ctx, plan)
     placed = []
     for beat, shots in line_shots(plan).items():
         pieces = [shot.line for shot in shots]
         for index, shot in enumerate(shots):
             out = piece_audio(Path(voice[beat].chosen), pieces, index, out_dir / f"{shot.id}.wav")
-            placed.append((out, shot.start_s))
+            placed.append((out, shot.start_s - (leads[beat] if index == 0 else 0.0)))
     return placed
 
 

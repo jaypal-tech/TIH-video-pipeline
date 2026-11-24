@@ -48,5 +48,6 @@ You receive the series config, the series bible (characters, places, props, moti
 ## Sound
 
 - Add `cues`: `music` for the score under the episode and its turns, `sfx` for key sounds. Each has a start, a duration, a gain and a short prompt in period.
+- Add one `ambience` cue per clip, with `scene` set to the clip number, spanning the whole clip: the place's background sound (rain, crowd, room tone). It is looped, and crossfades into the next clip's bed.
 
 Follow the example plan's level of detail and style.

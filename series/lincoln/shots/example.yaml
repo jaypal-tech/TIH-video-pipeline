@@ -338,10 +338,12 @@ shots:
 # Sound cues, in seconds from the start of the episode. `kind` picks the
 # model in pipeline.yaml: music (score, band) or sfx (beds, stings, hits).
 cues:
-  - {id: rain_bed, kind: sfx, at: 0.0, duration: 22.0, gain_db: -22, prompt: "steady night drizzle on umbrellas with a large outdoor crowd murmuring, no music"}
-  - {id: rain_bed_2, kind: sfx, at: 22.0, duration: 22.0, gain_db: -22, prompt: "steady night drizzle on umbrellas with a large outdoor crowd murmuring, no music"}
-  - {id: rain_bed_3, kind: sfx, at: 44.0, duration: 22.0, gain_db: -22, prompt: "steady night drizzle on umbrellas with a large outdoor crowd murmuring, no music"}
-  - {id: rain_tail, kind: sfx, at: 66.0, duration: 7.0, gain_db: -24, prompt: "soft night rain only, no voices"}
+  # one ambience bed per clip; each runs 0.5 s into the next for a soft scene change
+  - {id: bed_1, kind: ambience, scene: 1, at: 0.0, duration: 13.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: bed_2, kind: ambience, scene: 2, at: 13.0, duration: 14.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: bed_3, kind: ambience, scene: 3, at: 27.0, duration: 13.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: bed_4, kind: ambience, scene: 4, at: 40.0, duration: 13.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: bed_5, kind: ambience, scene: 5, at: 53.0, duration: 20.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
   - {id: band, kind: music, at: 0.0, duration: 13.0, gain_db: -18, prompt: "diegetic 1860s brass military band playing a march outdoors in rain, heard from within a crowd, ends abruptly mid-bar"}
   - {id: pulse, kind: sfx, at: 9.5, duration: 1.5, gain_db: -14, prompt: "single low cinematic pulse"}
   - {id: strings, kind: music, at: 25.0, duration: 33.5, gain_db: -20, prompt: "low sustained cello and viola drone, tense, slowly rising, period drama score, no percussion"}

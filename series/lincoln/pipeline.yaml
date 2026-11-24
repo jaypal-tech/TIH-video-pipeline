@@ -135,3 +135,4 @@ steps:
     arguments:
       text: "{prompt}"
       duration_seconds: "{duration_seconds}"
+      loop: "{loop}" # ambience beds only; left out for one-off effects

@@ -22,6 +22,9 @@ style:
   clean: "Clean frame with no text, letters, signs or watermark; period-accurate 1865 clothing, buildings and light only; natural hands; natural skin texture"
   video_negative: "morphing, warping face, flicker, extra limbs, deformed hands, sudden cut, text, watermark, modern objects, fast motion"
   sound_period: "1865 setting, acoustic sources only, no modern or electronic sounds"
+  grade: # applied once to the whole cut, before captions
+    eq: "contrast=1.05:saturation=0.85:gamma=0.97"
+    grain: 6
   lenses:
     CU: 85
     ECU: 85
