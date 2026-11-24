@@ -1,0 +1,124 @@
+# Which model does each generation step, and with what arguments.
+# Changing a model is a config change, not a code change.
+#
+# Argument templates: a value that is exactly "{name}" is replaced by the raw
+# value (a list, a number); any other string is filled with str.format. A key
+# whose value would be empty (None) is left out.
+# Values available: prompt, negative_prompt, image_url, image_urls, seed,
+# duration, text, voice_id, voice_description, preview_text, video_url,
+# audio_url, duration_seconds, length_ms.
+#
+# VERIFY BEFORE THE FIRST PAID RUN: argument names below follow fal's usual
+# schema, but check each against its model page in the Proving Ground. A wrong
+# name fails fast with an error (no output, no charge on most endpoints).
+#
+# estimate_usd is what the budget guard reserves before each call. Keep it at
+# or above the real price so the hard stop can't be passed.
+
+steps:
+  look:
+    endpoint: google/nano-banana-2.1
+    estimate_usd: 0.15
+    takes: 3
+    arguments:
+      prompt: "{prompt}"
+      negative_prompt: "{negative_prompt}"
+      aspect_ratio: "1:1"
+      seed: "{seed}"
+      num_images: 1
+
+  voice_design:
+    endpoint: fal-ai/minimax/voice-design
+    estimate_usd: 3.02
+    takes: 2
+    arguments:
+      prompt: "{voice_description}"
+      preview_text: "{preview_text}"
+
+  keyframe:
+    endpoint: google/nano-banana-2.1/edit
+    estimate_usd: 0.15
+    takes: 2
+    arguments:
+      prompt: "{prompt}"
+      negative_prompt: "{negative_prompt}"
+      image_urls: "{image_urls}"
+      aspect_ratio: "9:16"
+      seed: "{seed}"
+      num_images: 1
+    fallbacks:
+      - endpoint: bytedance/seedream/v5.5/edit
+        arguments:
+          prompt: "{prompt}"
+          image_urls: "{image_urls}"
+          image_size: portrait_16_9
+          seed: "{seed}"
+
+  keyframe_no_refs:
+    endpoint: google/nano-banana-2.1
+    estimate_usd: 0.15
+    takes: 2
+    arguments:
+      prompt: "{prompt}"
+      negative_prompt: "{negative_prompt}"
+      aspect_ratio: "9:16"
+      seed: "{seed}"
+      num_images: 1
+
+  motion:
+    endpoint: fal-ai/kling-video/v3/pro/image-to-video
+    estimate_usd: 1.20 # 10 s at $0.112/s, rounded up
+    takes: 1
+    durations: [5, 10] # seconds the model accepts; the shortest that covers the shot is used
+    arguments:
+      prompt: "{prompt}"
+      negative_prompt: "{negative_prompt}"
+      image_url: "{image_url}"
+      duration: "{duration}"
+      generate_audio: false
+    fallbacks:
+      - endpoint: minimax/h3-max/image-to-video
+        arguments:
+          prompt: "{prompt}"
+          image_url: "{image_url}"
+          duration: "{duration}"
+          resolution: 1080P
+
+  speech:
+    endpoint: fal-ai/minimax/speech-2.8-hd
+    estimate_usd: 0.02
+    takes: 2 # a second take only if the first fails the word check
+    pause_token: "<#0.6#>" # replaces … so the ellipsis is a pause, never a word
+    arguments:
+      text: "{text}"
+      voice_setting:
+        voice_id: "{voice_id}"
+      output_format: url
+
+  transcribe:
+    endpoint: fal-ai/elevenlabs/speech-to-text/scribe-v2
+    estimate_usd: 0.01
+    arguments:
+      audio_url: "{audio_url}"
+
+  lipsync:
+    endpoint: fal-ai/sync-lipsync/v3
+    estimate_usd: 1.00 # up to 7.5 s of video at $8/min
+    arguments:
+      video_url: "{video_url}"
+      audio_url: "{audio_url}"
+      sync_mode: cut_off
+
+  music:
+    endpoint: elevenlabs/music/v2.5
+    estimate_usd: 0.60
+    arguments:
+      prompt: "{prompt}"
+      music_length_ms: "{length_ms}"
+
+  sfx:
+    endpoint: elevenlabs/sound-effects/v3
+    estimate_usd: 0.10
+    arguments:
+      text: "{prompt}"
+      duration_seconds: "{duration_seconds}"

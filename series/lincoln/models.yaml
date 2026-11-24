@@ -82,3 +82,7 @@ endpoints:
     unit: tokens
     input_per_mtok: 4.0
     output_per_mtok: 20.0
+
+  # Text-to-image for reference sheets and shots with no character
+  google/nano-banana-2.1:
+    unit: usage
