@@ -11,6 +11,14 @@ class KnowledgeRule(BaseModel):
     not_before: int
 
 
+class Budget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    warn: float = 1500.0
+    stop: float = 3000.0
+    proving_cap: float = 100.0
+
+
 class SeriesConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -25,6 +33,7 @@ class SeriesConfig(BaseModel):
     ending_convention: str = ""
     batch_size: int = 10
     source_format: Literal["table_script", "freeform"] = "freeform"
+    budget: Budget = Field(default_factory=Budget)
 
 
 def load_series(name: str) -> SeriesConfig:

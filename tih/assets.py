@@ -15,6 +15,7 @@ class ShotRef:
     episode: int | None = None
     clip: int | None = None
     shot: int | str | None = None
+    step: str | None = None
 
     def parts(self) -> list[str]:
         parts = ["season" if self.episode is None else f"ep{self.episode:02d}"]
@@ -22,6 +23,8 @@ class ShotRef:
             parts.append(f"clip{self.clip:02d}")
         if self.shot is not None:
             parts.append("shot" + re.sub(r"[^A-Za-z0-9_-]", "_", str(self.shot)))
+        if self.step is not None:
+            parts.append(re.sub(r"[^A-Za-z0-9_-]", "_", self.step))
         return parts
 
 

@@ -2,9 +2,10 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
@@ -18,6 +19,7 @@ from tih.budget import BudgetGuard
 from tih.ledger import CallRecord, Ledger, fingerprint
 from tih.paths import RunPaths
 from tih.providers.pricing import read_cost
+from tih.series import load_series
 
 REFUSAL_TYPES = {"content_policy_violation", "content_policy", "safety_violation"}
 REFUSAL_TEXT = re.compile(
@@ -47,6 +49,8 @@ class Transport(Protocol):
 
     def download(self, url: str, destination: Path) -> None: ...
 
+    def upload(self, path: Path) -> str: ...
+
 
 def is_refusal(status_code: int, error_type: str | None, message: str) -> bool:
     if not 400 <= status_code < 500:
@@ -69,8 +73,17 @@ def fal_key() -> str:
 
 
 class FalTransport:
+    """Talks to fal. The key is read on the first real call, so a re-run whose
+    takes are all reused from the ledger works without one."""
+
     def __init__(self) -> None:
-        self.client = fal_client.SyncClient(key=fal_key())
+        self._client: fal_client.SyncClient | None = None
+
+    @property
+    def client(self) -> fal_client.SyncClient:
+        if self._client is None:
+            self._client = fal_client.SyncClient(key=fal_key())
+        return self._client
 
     def submit(self, endpoint: str, arguments: dict[str, Any]) -> str:
         try:
@@ -98,6 +111,9 @@ class FalTransport:
                 for chunk in response.iter_bytes():
                     handle.write(chunk)
 
+    def upload(self, path: Path) -> str:
+        return self.client.upload_file(path)
+
 
 @dataclass
 class GatewayContext:
@@ -111,7 +127,21 @@ class GatewayContext:
     def for_run(cls, paths: RunPaths) -> "GatewayContext":
         ledger = Ledger(paths.root / paths.series / "calls.jsonl")
         models_file = Path("series") / paths.series / "models.yaml"
-        return cls(paths, ledger, BudgetGuard(ledger), FalTransport(), models_file)
+        budget = load_series(paths.series).budget
+        guard = BudgetGuard(ledger, warn=budget.warn, stop=budget.stop)
+        return cls(paths, ledger, guard, FalTransport(), models_file)
+
+
+def upload_local(ctx: GatewayContext, path: Path) -> str:
+    """Upload a local file once and reuse its URL, so call fingerprints stay stable."""
+    cache_file = ctx.paths.root / ctx.paths.series / "uploads.json"
+    cache = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file.exists() else {}
+    digest = _sha256(Path(path))
+    if digest not in cache:
+        cache[digest] = ctx.transport.upload(Path(path))
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text(json.dumps(cache, indent=2), encoding="utf-8")
+    return cache[digest]
 
 
 @dataclass
@@ -120,6 +150,8 @@ class GenerationResult:
     status: str
     output_paths: list[Path] = field(default_factory=list)
     payload: dict[str, Any] = field(default_factory=dict)
+    endpoint: str = ""
+    over_warn: bool = False
 
 
 def _is_input(value: Any) -> bool:
@@ -228,6 +260,12 @@ def _attempt(
     else:
         call_id = uuid.uuid4().hex
         reservation = ctx.budget.reserve(estimate_usd)
+        if reservation.over_warn:
+            print(
+                f"Budget warning: spend passes ${ctx.budget.warn:.2f} "
+                f"with this {step} call",
+                file=sys.stderr,
+            )
         try:
             ctx.ledger.append(
                 CallRecord(
@@ -256,6 +294,7 @@ def _attempt(
             return _record_failure(ctx, call_id, error)
         ctx.ledger.update(call_id, request_id=request_id)
 
+    shot_ref = shot_ref if shot_ref.step else replace(shot_ref, step=step)
     started = time.monotonic()
     try:
         payload = ctx.transport.wait(endpoint, request_id)
@@ -306,6 +345,9 @@ def _attempt(
     return GenerationResult(call_id, "ok", outputs, payload)
 
 
+Fallback = str | tuple[str, dict[str, Any]]
+
+
 def generate(
     ctx: GatewayContext,
     step: str,
@@ -313,25 +355,33 @@ def generate(
     arguments: dict[str, Any],
     shot_ref: ShotRef,
     estimate_usd: float,
-    fallbacks: tuple[str, ...] = (),
+    fallbacks: tuple[Fallback, ...] = (),
     take: int = 0,
     quantity: float | None = None,
     expects_files: bool = True,
 ) -> GenerationResult:
-    """Make one logged, budget-checked provider call, using fallbacks on refusal."""
+    """Make one logged, budget-checked provider call, using fallbacks on refusal.
+
+    A fallback is an endpoint name (same arguments) or (endpoint, arguments),
+    because different models often name the same setting differently.
+    """
     result = GenerationResult("", "error")
-    for candidate in (endpoint, *fallbacks):
+    candidates = [(endpoint, arguments)]
+    for fallback in fallbacks:
+        candidates.append(fallback if isinstance(fallback, tuple) else (fallback, arguments))
+    for candidate, candidate_arguments in candidates:
         result = _attempt(
             ctx,
             step,
             candidate,
-            arguments,
+            candidate_arguments,
             shot_ref,
             estimate_usd,
             take,
             quantity,
             expects_files,
         )
+        result.endpoint = candidate
         if result.status not in {"blocked", "empty"}:
             return result
     return result
