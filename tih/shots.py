@@ -1,6 +1,8 @@
 """Shot plans: one YAML file per episode that says what to film.
 
-`load_plan` reads series/<series>/shots/epNN.yaml. `resolve_plan` checks it
+The Director writes each episode's plan to runs/<series>/epNN/director/shots.yaml;
+series/<series>/shots/example.yaml is a hand-made plan the Director follows for
+style. `resolve_plan` checks a plan
 against the locked script and the bible, then returns shots with their start
 times, exact line text, speaker and fully expanded prompts. Every generation
 stage reads the resolved plan, never the raw YAML.
@@ -12,12 +14,11 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from tih.bible import Bible, check_forbidden, expand, tokens_in
+from tih.bible import Bible, check_forbidden, expand, series_dir, tokens_in
+from tih.paths import RunPaths
 from tih.story.models import Delivery, Episode, Evidence
 
 OverlayKind = Literal["corner_bug", "time_super", "name_card", "super", "true_card"]
-MIN_RUNTIME_S = 60.0
-MAX_RUNTIME_S = 90.0
 
 
 class ShotOverlay(BaseModel):
@@ -94,12 +95,17 @@ class PlanError(ValueError):
     """The shot plan does not match the script or the bible."""
 
 
-def plan_path(series: str, episode: int) -> Path:
-    return Path("series") / series / "shots" / f"ep{episode:02d}.yaml"
+def plan_path(paths: RunPaths) -> Path:
+    """Where the Director writes this episode's shot plan."""
+    return paths.scope_dir / "director" / "shots.yaml"
 
 
-def load_plan(series: str, episode: int) -> ShotPlan:
-    path = plan_path(series, episode)
+def example_plan_path(series: str) -> Path:
+    """A hand-made plan the Director follows for style; optional."""
+    return series_dir(series) / "shots" / "example.yaml"
+
+
+def load_plan(path: Path) -> ShotPlan:
     return ShotPlan.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
@@ -114,7 +120,9 @@ def _speaker_id(speaker: str, bible: Bible) -> str:
     raise PlanError(f"Speaker {speaker} is not in the bible")
 
 
-def resolve_plan(plan: ShotPlan, episode: Episode, bible: Bible) -> ResolvedPlan:
+def resolve_plan(
+    plan: ShotPlan, episode: Episode, bible: Bible, runtime_s: tuple[int, int] = (60, 90)
+) -> ResolvedPlan:
     """Check the plan against the script and bible; return ready-to-run shots."""
     errors: list[str] = []
     beats = {beat.id: (clip.number, beat) for clip in episode.clips for beat in clip.beats}
@@ -203,8 +211,9 @@ def resolve_plan(plan: ShotPlan, episode: Episode, bible: Bible) -> ResolvedPlan
             )
 
     runtime = round(start, 3)
-    if not MIN_RUNTIME_S <= runtime <= MAX_RUNTIME_S:
-        errors.append(f"runtime {runtime} s is outside 60-90 s")
+    low, high = runtime_s
+    if not low <= runtime <= high:
+        errors.append(f"runtime {runtime} s is outside {low}-{high} s")
     if errors:
         raise PlanError("Shot plan problems:\n- " + "\n- ".join(errors))
     return ResolvedPlan(
@@ -214,3 +223,22 @@ def resolve_plan(plan: ShotPlan, episode: Episode, bible: Bible) -> ResolvedPlan
         shots=resolved,
         cues=plan.cues,
     )
+
+
+def render_plan(plan: ResolvedPlan) -> str:
+    """The shot plan as a readable table for the owner."""
+    rows = ["| Shot | Start | Dur | Size | Cast | Line | Lip-sync |", "|---|---|---|---|---|---|---|"]
+    for shot in plan.shots:
+        line = f"{shot.speaker}: {shot.line}" if shot.line else ""
+        rows.append(
+            f"| {shot.id} | {shot.start_s:.1f} | {shot.duration:.1f} | {shot.size} "
+            f"{shot.lens_mm}mm | {', '.join(shot.cast)} | {line} | "
+            f"{'yes' if shot.needs_lipsync else ''} |"
+        )
+    lipsync = sum(shot.needs_lipsync for shot in plan.shots)
+    head = (
+        f"# Episode {plan.episode} shot plan\n\n"
+        f"{len(plan.shots)} shots, {plan.runtime_s:.1f} s, {lipsync} lip-sync shots, "
+        f"{len(plan.cues)} sound cues.\n\n"
+    )
+    return head + "\n".join(rows) + "\n"

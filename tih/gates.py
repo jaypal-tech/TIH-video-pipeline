@@ -35,7 +35,7 @@ def gate_artifacts(paths: RunPaths, gate: str) -> list[Path]:
         return [
             series_dir(paths.series) / "bible.yaml",
             locks_path(paths.series),
-            plan_path(paths.series, paths.episode),
+            plan_path(paths),
         ]
     if gate == "picture":
         return [paths.scope_dir / "cut" / "final.mp4"]

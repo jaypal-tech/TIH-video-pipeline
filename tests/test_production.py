@@ -5,6 +5,7 @@ placeholder media with ffmpeg and records every call in a temporary ledger.
 """
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -23,8 +24,9 @@ from tih.providers.dry import DryRunTransport
 from tih.providers.fal import GatewayContext, generate
 from tih.assets import ShotRef
 from tih.series import load_series
-from tih.shots import PlanError, load_plan, resolve_plan
+from tih.shots import PlanError, example_plan_path, load_plan, plan_path, resolve_plan
 from tih.stages.performance import model_duration, source_seconds
+from tih.stages import registry
 from tih.stages.registry import RunContext, run_stage
 from tih.stages.voice import speech_text, word_difference
 from tih.story.models import Episode
@@ -46,14 +48,25 @@ def episode_one(tmp_path):
     return Episode.model_validate(yaml.safe_load(script.read_text(encoding="utf-8")))
 
 
+def _staged(ctx):
+    """Stand in for the Writer and the Director: the draft script and the example plan."""
+    scope = ctx.paths.scope_dir
+    (scope / "writers_room").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(scope / "record" / "script.yaml", scope / "writers_room" / "script.yaml")
+    plan_path(ctx.paths).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(example_plan_path("lincoln"), plan_path(ctx.paths))
+    registry._write_done(ctx, "writers_room")
+    registry._write_done(ctx, "director")
+
+
 def _plan_with(change):
-    plan = load_plan("lincoln", 1)
+    plan = load_plan(example_plan_path("lincoln"))
     change(plan)
     return plan
 
 
 def test_episode_one_plan_matches_script(episode_one):
-    plan = resolve_plan(load_plan("lincoln", 1), episode_one, load_bible("lincoln"))
+    plan = resolve_plan(load_plan(example_plan_path("lincoln")), episode_one, load_bible("lincoln"))
     assert (len(plan.shots), plan.runtime_s) == (29, 73.0)
     assert [s.id for s in plan.shots if s.needs_lipsync] == [
         "1.1", "1.3", "1.4", "2.3", "3.2", "3.3", "4.1", "4.4", "5.1", "5.4",
@@ -63,7 +76,7 @@ def test_episode_one_plan_matches_script(episode_one):
 
 def test_every_prompt_carries_locked_look_text(episode_one):
     bible = load_bible("lincoln")
-    plan = resolve_plan(load_plan("lincoln", 1), episode_one, bible)
+    plan = resolve_plan(load_plan(example_plan_path("lincoln")), episode_one, bible)
     for shot in plan.shots:
         assert bible.style.look in shot.keyframe_prompt
         for character in shot.cast:
@@ -116,6 +129,9 @@ def test_gate_blocks_until_approved_and_after_edit(tmp_path, monkeypatch):
     locks.write_text("characters: {}\n")
     monkeypatch.setenv("TIH_LOCKS_FILE", str(locks))
     paths = RunPaths("lincoln", 1, root=tmp_path)
+    ctx = RunContext(paths=paths)
+    run_stage(ctx, "record")
+    _staged(ctx)
     with pytest.raises(GateNotApproved):
         require_approved(paths, "look")
     approve(paths, "look")
@@ -194,6 +210,7 @@ def test_keyframes_refuse_without_locked_look(tmp_path, monkeypatch):
                              ROOT / "series" / "lincoln" / "models.yaml")
     ctx = RunContext(paths=paths, gateway=gateway)
     run_stage(ctx, "record")
+    _staged(ctx)
     run_stage(ctx, "shotplan")
     with pytest.raises(GateNotApproved):
         run_stage(ctx, "keyframes")
@@ -239,3 +256,33 @@ def test_rehearsal_makes_a_valid_master_and_reruns_free(tmp_path):
     for stage in ("keyframes", "motion", "voice", "lipsync", "sound"):
         run_stage(ctx, stage, force=True)
     assert len(ledger.current()) == count
+
+
+def test_shotplan_reads_writer_script(tmp_path):
+    ctx = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path))
+    run_stage(ctx, "record")
+    _staged(ctx)
+    script = ctx.paths.scope_dir / "writers_room" / "script.yaml"
+    script.write_text(script.read_text(encoding="utf-8").replace("Not in this crowd.", "Not here."), encoding="utf-8")
+    with pytest.raises(PlanError, match="e1c1b2"):
+        run_stage(ctx, "shotplan")
+
+
+def test_look_lock_covers_director_plan(tmp_path, monkeypatch):
+    locks = tmp_path / "locks.yaml"
+    locks.write_text("characters: {}\n")
+    monkeypatch.setenv("TIH_LOCKS_FILE", str(locks))
+    ctx = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path))
+    run_stage(ctx, "record")
+    _staged(ctx)
+    approve(ctx.paths, "look")
+    require_approved(ctx.paths, "look")
+    plan = plan_path(ctx.paths)
+    plan.write_text(plan.read_text(encoding="utf-8") + "\n# edited\n", encoding="utf-8")
+    with pytest.raises(ArtifactChanged, match="director/shots.yaml"):
+        require_approved(ctx.paths, "look")
+
+
+def test_plan_runtime_uses_series_range(episode_one):
+    with pytest.raises(PlanError, match="outside 80-90"):
+        resolve_plan(load_plan(example_plan_path("lincoln")), episode_one, load_bible("lincoln"), runtime_s=(80, 90))
