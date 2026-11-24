@@ -20,6 +20,14 @@ class CraftTargets(BaseModel):
     max_places: int
 
 
+class Budget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    warn: float = 1500.0
+    stop: float = 3000.0
+    proving_cap: float = 100.0
+
+
 class SeriesConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -37,6 +45,7 @@ class SeriesConfig(BaseModel):
     runtime_s: tuple[int, int] = (60, 90)
     script_notes: dict[int, list[str]] = Field(default_factory=dict)
     craft: CraftTargets | None = None
+    budget: Budget = Field(default_factory=Budget)
 
 
 def load_series(name: str) -> SeriesConfig:

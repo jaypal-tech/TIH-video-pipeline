@@ -18,6 +18,9 @@ class MissingStage(RuntimeError):
 @dataclass(frozen=True)
 class RunContext:
     paths: RunPaths
+    # The provider gateway for paid stages. Tests pass a fake one; when it is
+    # None, paid stages build the real fal gateway from the series config.
+    gateway: object | None = None
 
 
 @dataclass(frozen=True)

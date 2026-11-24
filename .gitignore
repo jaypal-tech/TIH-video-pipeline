@@ -1,5 +1,6 @@
 .env
 runs/
+runs-dry/
 export/
 series/*/assets/
 docs/

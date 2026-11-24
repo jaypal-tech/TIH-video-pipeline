@@ -2,6 +2,10 @@ title: "Lincoln: The Conspiracy"
 episodes: 30
 true_story: true
 source_format: table_script
+budget:
+  warn: 1500.00
+  stop: 3000.00
+  proving_cap: 100.00
 paywalls:
   5: early
   11: late

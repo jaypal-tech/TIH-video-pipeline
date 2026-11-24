@@ -25,3 +25,7 @@ pytest = "^9.2.0"
 
 [project.scripts]
 tih = "tih.cli:app"
+
+[tool.pytest.ini_options]
+markers = ["slow: full rehearsal of an episode with placeholder media (about a minute)"]
+addopts = "-m 'not slow'"
