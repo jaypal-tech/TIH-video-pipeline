@@ -284,9 +284,9 @@ shots:
     beat: e1c5b2
     duration: 3.5
     size: MCU
-    cast: [booth, powell]
+    cast: [booth]
     place: L1
-    keyframe: 85mm medium close-up of [BOOTH] in [L1], back to the window, speaking past [POWELL]'s shoulder in soft focus
+    keyframe: 85mm medium close-up of [BOOTH] in [L1], back to the window, speaking past a broad dark shoulder in soft focus in the foreground, no second face in frame
     motion: He speaks quietly, still, one breath
     line: That is the last speech he will ever make.
     delivery: face

@@ -17,7 +17,7 @@ from tih.budget import BudgetGuard
 from tih.cli import rehearse_episode
 from tih.gates import ArtifactChanged, GateNotApproved, approve, require_approved
 from tih.ledger import Ledger
-from tih.media.ffmpeg import validate_master
+from tih.media.ffmpeg import duration, validate_master
 from tih.paths import RunPaths
 from tih.production import load_resolved, read_takes, render_arguments
 from tih.providers.dry import DryRunTransport
@@ -28,7 +28,7 @@ from tih.shots import PlanError, example_plan_path, load_plan, plan_path, resolv
 from tih.stages.performance import model_duration, source_seconds
 from tih.stages import registry
 from tih.stages.registry import RunContext, run_stage
-from tih.stages.voice import speech_text, word_difference
+from tih.stages.voice import slice_for_shot, speech_text, word_difference
 from tih.story.models import Episode
 
 ROOT = Path(__file__).parents[1]
@@ -398,3 +398,40 @@ def test_second_rehearsal_uses_new_plan(tmp_path):
     ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
     edl = yaml.safe_load((ctx.paths.scope_dir / "cut" / "edl.yaml").read_text(encoding="utf-8"))
     assert edl[0]["duration"] == 3.0
+
+
+def test_slice_for_shot_boundaries():
+    spoken = "I would myself prefer that it were now".split()
+    timed = [{"text": w, "start": i * 0.5, "end": i * 0.5 + 0.4, "type": "word"} for i, w in enumerate(spoken)]
+    timed.insert(1, {"text": " ", "start": 0.4, "end": 0.5, "type": "spacing"})
+    pieces = ["I would myself prefer", "that it were now"]
+    assert slice_for_shot(timed, pieces, 0) == (0.0, 2.0)
+    assert slice_for_shot(timed, pieces, 1) == (2.0, 3.9)
+
+
+def test_lipsync_shot_needs_one_face(episode_one):
+    def edit(plan):
+        speaking = next(s for s in plan.shots if s.id == "1.1")
+        speaking.cast = ["booth", "powell"]
+
+    with pytest.raises(PlanError, match="lip-sync shot needs exactly one face"):
+        resolve_plan(_plan_with(edit), episode_one, load_bible("lincoln"))
+
+
+@pytest.mark.slow
+def test_line_voiced_once_and_sliced_per_shot(tmp_path):
+    source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
+    run_stage(source, "record")
+    _staged(source)
+    root = tmp_path / "dry"
+    ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
+    plan = load_resolved(ctx)
+    beats_with_lines = {s.beat for s in plan.shots if s.line}
+    calls = [r for r in Ledger(root / "lincoln" / "calls.jsonl").current() if r.step == "voice"]
+    assert len(calls) == len(beats_with_lines)
+    voice = read_takes(ctx, "voice")
+    assert set(voice) == beats_with_lines
+    shot = next(s for s in plan.shots if s.id == "4.1")
+    whole = duration(Path(voice[shot.beat].chosen))
+    piece = duration(ctx.paths.scope_dir / "lipsync" / "audio" / "4.1.wav")
+    assert 0 < piece < whole

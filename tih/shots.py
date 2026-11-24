@@ -198,6 +198,9 @@ def resolve_plan(
             errors.append(f"{where}: {error}")
             continue
 
+        if shot.line is not None and shot.delivery == Delivery.face and len(shot.cast) != 1:
+            errors.append(f"{where}: lip-sync shot needs exactly one face (cast {shot.cast})")
+
         resolved.append(
             ResolvedShot(
                 **shot.model_dump(),

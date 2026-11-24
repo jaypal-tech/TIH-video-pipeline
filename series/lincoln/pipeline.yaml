@@ -91,6 +91,8 @@ steps:
       prompt: "{text}"
       voice_setting:
         voice_id: "{voice_id}"
+        speed: "{speed}" # from the line's direction (tih.briefs); left out when none
+        emotion: "{emotion}"
       language_boost: English
       output_format: url
 

@@ -20,7 +20,7 @@ You receive the series config, the series bible (characters, places, props, moti
 
 ## Lines and lips
 
-- `delivery: face` only when the speaker's face is on screen and speaking in that shot; that shot gets lip-sync. Otherwise use `off` (heard, not seen) or `inner` (a thought), matching the script line's delivery where it says `off` or `inner`.
+- `delivery: face` only when the speaker's face is on screen and speaking in that shot; that shot gets lip-sync. A `face` shot shows exactly one face: its `cast` is the speaker alone. Anyone else is off frame, a back to camera, or a soft shoulder with no face, and is not in `cast`. Otherwise use `off` (heard, not seen) or `inner` (a thought), matching the script line's delivery where it says `off` or `inner`.
 - Give a line enough time to be spoken: about 2.5 words per second, plus a beat.
 
 ## Pace for a phone

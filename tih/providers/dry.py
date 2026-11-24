@@ -76,7 +76,12 @@ class DryRunTransport:
         if kind == "transcript":
             source = self.uploads.get(str(arguments.get("audio_url")))
             text = self.spoken.get(_sha(source), "") if source else ""
-            return {"text": text}
+            timed = [
+                {"text": word, "start": round(i * SECONDS_PER_WORD, 3),
+                 "end": round((i + 1) * SECONDS_PER_WORD - 0.05, 3), "type": "word"}
+                for i, word in enumerate(text.split())
+            ]
+            return {"text": text, "words": timed}
         if kind == "voice_design":
             url = self._url(request_id, ".mp3", {"kind": "tone", "seconds": 2.0, "text": ""})
             return {"custom_voice_id": f"dry-voice-{request_id[4:12]}", "audio": {"url": url}}
