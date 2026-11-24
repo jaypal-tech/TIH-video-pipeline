@@ -17,6 +17,7 @@ from tih.budget import BudgetGuard
 from tih.gates import approve as approve_gate
 from tih.ledger import Ledger
 from tih.paths import RunPaths
+from tih.probe import probe_estimate, run_probe
 from tih.production import read_takes, save_pick
 from tih.providers.dry import DryRunTransport
 from tih.providers.fal import GatewayContext
@@ -239,3 +240,22 @@ def log(
     records = ledger.current()
     spent = sum(r.cost_usd or 0.0 for r in records)
     typer.echo(f"{len(records)} calls, ${spent:.2f} logged, written to {out}")
+
+
+@app.command()
+def probe(
+    number: int,
+    series: str = typer.Option(..., "--series"),
+    shot: str = typer.Option("1.1", "--shot", help="a lip-sync shot with one face in the example plan"),
+    yes: bool = typer.Option(False, "--yes", help="spend real money"),
+    root: Path = typer.Option(Path("runs"), "--root"),
+) -> None:
+    """One real call per generation step, to prove each model accepts our arguments."""
+    typer.echo(f"Probe: 9 calls, budget reserve up to ${probe_estimate(series):.2f} (real cost is lower).")
+    if not yes:
+        typer.echo("Nothing spent. Add --yes to run it.")
+        return
+    results = run_probe(_context(str(number), series, root), shot)
+    for r in results:
+        typer.echo(f"{r.step:13} {r.status:8} {r.endpoint} {r.error}")
+    typer.echo(f"Report: {root / series / 'probe' / 'report.md'}")
