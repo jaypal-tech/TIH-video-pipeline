@@ -8,6 +8,7 @@ what every later shot uses.
 
 from tih.assets import ShotRef
 from tih.bible import character_text, load_bible, load_locks
+from tih.briefs import voice_design_brief
 from tih.gates import require_approved
 from tih.production import (
     TakeSet,
@@ -54,6 +55,8 @@ def run_casting(ctx: RunContext) -> None:
             continue
         config = steps["look"]
         prompt = bible.style.reference_sheet.format(look=character_text(bible, character_id))
+        if bible.style.clean:
+            prompt = f"{prompt}. {bible.style.clean}"
         takes = []
         for take in range(config.takes):
             result = call_step(
@@ -62,7 +65,6 @@ def run_casting(ctx: RunContext) -> None:
                 "look",
                 {
                     "prompt": prompt,
-                    "negative_prompt": bible.style.negative,
                     "seed": BASE_SEED + take,
                 },
                 ShotRef(episode=None, shot=character_id, step="look"),
@@ -83,7 +85,7 @@ def run_casting(ctx: RunContext) -> None:
                 config,
                 "voice_design",
                 {
-                    "voice_description": bible.characters[character_id].voice,
+                    "voice_description": voice_design_brief(bible.characters[character_id]),
                     "preview_text": first_line[character_id],
                 },
                 ShotRef(episode=None, shot=character_id, step="voice_design"),

@@ -78,6 +78,7 @@ class ResolvedShot(PlannedShot):
     evidence: Evidence | None = None
     evidence_label: str | None = None
     needs_lipsync: bool = False
+    direction: str = ""  # the script line's acting direction; sets speech speed and emotion
     keyframe_prompt: str
     negative_prompt: str
     motion_prompt: str
@@ -174,6 +175,7 @@ def resolve_plan(
                 errors.append(f"{where}: overlay is not on beat {beat.id}: {overlay.text}")
 
         speaker = evidence = label = None
+        direction = ""
         if shot.line is not None:
             if beat.line is None:
                 errors.append(f"{where}: has a line but beat {beat.id} has none")
@@ -184,6 +186,7 @@ def resolve_plan(
                 speaker = _speaker_id(beat.line.speaker, bible)
                 evidence = beat.line.evidence
                 label = beat.line.evidence_label
+                direction = beat.line.direction
             if shot.delivery is None:
                 errors.append(f"{where}: a line needs a delivery")
 
@@ -205,6 +208,7 @@ def resolve_plan(
                 evidence=evidence,
                 evidence_label=label,
                 needs_lipsync=shot.line is not None and shot.delivery == Delivery.face,
+                direction=direction,
                 keyframe_prompt=keyframe,
                 negative_prompt=bible.style.negative,
                 motion_prompt=motion,

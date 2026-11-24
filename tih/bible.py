@@ -25,6 +25,9 @@ class Style(BaseModel):
     negative: str
     reference_sheet: str
     lenses: dict[str, int]
+    clean: str = ""  # positive "keep the frame clean" text; image models ignore negatives
+    video_negative: str = ""
+    sound_period: str = ""
 
 
 class Character(BaseModel):

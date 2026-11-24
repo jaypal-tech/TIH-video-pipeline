@@ -7,6 +7,8 @@ it should sound like; `kind` picks the music or sfx model in pipeline.yaml.
 import math
 
 from tih.assets import ShotRef
+from tih.bible import load_bible
+from tih.briefs import cue_brief
 from tih.gates import require_approved
 from tih.production import (
     TakeSet,
@@ -28,13 +30,14 @@ def run_sound(ctx: RunContext) -> None:
     require_approved(ctx.paths, "look")
     plan = load_resolved(ctx)
     steps = load_pipeline(ctx.paths.series).steps
+    bible = load_bible(ctx.paths.series)
     gateway = gateway_for(ctx)
 
     sets: dict[str, TakeSet] = {}
     for cue in plan.cues:
         config = steps[cue.kind]
         values = {
-            "prompt": cue.prompt,
+            "prompt": cue_brief(cue, bible),
             "length_ms": int(math.ceil(cue.duration * 1000)),
             "duration_seconds": min(max(cue.duration, 0.5), SFX_MAX_SECONDS),
         }

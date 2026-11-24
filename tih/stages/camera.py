@@ -1,15 +1,16 @@
 """Stage: keyframes. One still per shot, built only from locked looks.
 
-Paid. Each shot's prompt is the shot plan's keyframe text with bible tokens
-expanded, plus the style block; the locked reference image of every
-character in the shot is attached, and the first character's locked seed is
-used. Shots with nobody in them use the text-only step.
+Paid. Each shot's prompt comes from tih.briefs: every attached reference is
+named by its image number, the shot is described before the style; the locked
+reference image of every character in the shot is attached, and the first
+character's locked seed is used. Shots with nobody in them use the text-only step.
 """
 
 from pathlib import Path
 
 from tih.assets import ShotRef
-from tih.bible import load_locks, require_look
+from tih.bible import load_bible, load_locks, require_look
+from tih.briefs import keyframe_brief
 from tih.gates import require_approved
 from tih.production import (
     TakeSet,
@@ -30,6 +31,7 @@ def run_keyframes(ctx: RunContext) -> None:
     require_approved(ctx.paths, "script")
     require_approved(ctx.paths, "look")
     locks = load_locks(ctx.paths.series)
+    bible = load_bible(ctx.paths.series)
     plan = load_resolved(ctx)
     steps = load_pipeline(ctx.paths.series).steps
     gateway = gateway_for(ctx)
@@ -48,8 +50,7 @@ def run_keyframes(ctx: RunContext) -> None:
                 config,
                 "keyframe",
                 {
-                    "prompt": shot.keyframe_prompt,
-                    "negative_prompt": shot.negative_prompt,
+                    **keyframe_brief(shot, bible),
                     "image_urls": references or None,
                     "seed": seed_for(base_seed, take),
                 },

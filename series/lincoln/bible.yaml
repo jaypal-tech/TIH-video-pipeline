@@ -19,6 +19,9 @@ style:
     character reference sheet, {look}, front view, three-quarter view,
     profile, full body, plain grey background, soft even light, photoreal,
     1865 period accurate
+  clean: "Clean frame with no text, letters, signs or watermark; period-accurate 1865 clothing, buildings and light only; natural hands; natural skin texture"
+  video_negative: "morphing, warping face, flicker, extra limbs, deformed hands, sudden cut, text, watermark, modern objects, fast motion"
+  sound_period: "1865 setting, acoustic sources only, no modern or electronic sounds"
   lenses:
     CU: 85
     ECU: 85

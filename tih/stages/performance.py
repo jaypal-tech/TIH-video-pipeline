@@ -9,6 +9,8 @@ import math
 from pathlib import Path
 
 from tih.assets import ShotRef
+from tih.bible import load_bible
+from tih.briefs import motion_brief
 from tih.gates import require_approved
 from tih.production import (
     TakeSet,
@@ -45,6 +47,7 @@ def run_motion(ctx: RunContext) -> None:
     require_approved(ctx.paths, "look")
     plan = load_resolved(ctx)
     keyframes = read_takes(ctx, "keyframes")
+    bible = load_bible(ctx.paths.series)
     config = load_pipeline(ctx.paths.series).steps["motion"]
     gateway = gateway_for(ctx)
 
@@ -61,8 +64,7 @@ def run_motion(ctx: RunContext) -> None:
                 config,
                 "video",
                 {
-                    "prompt": shot.motion_prompt,
-                    "negative_prompt": shot.negative_prompt,
+                    **motion_brief(shot, bible),
                     "image_url": image_url,
                     "duration": str(seconds),
                 },
