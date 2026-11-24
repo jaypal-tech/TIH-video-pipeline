@@ -264,6 +264,42 @@ def test_each_step_sees_the_work_before_it(season, tmp_path, monkeypatch):
     assert "<plan_a>" in client.sent(9) and "<plan_b>" in client.sent(9)
 
 
+def test_single_pass_plans_in_one_call_then_uses_the_same_critic(season, tmp_path, monkeypatch):
+    replies = run_replies(valid_plan(), revised_plan())
+    client = FakeClient(reply(valid_plan()), *replies[4:], *compare_replies())
+    llm = use_client(monkeypatch, tmp_path, client)
+    story_room.run_story_room_single(season)
+
+    roles = [r.settings["role"] for r in llm.ledger.current()]
+    assert roles == [
+        "showrunner_single",
+        "critic_episodes",
+        "critic_season",
+        "critic_truth",
+        "showrunner_changes",
+        "showrunner_revise",
+        "compare",
+        "compare",
+    ]
+    assert client.calls[0]["output_format"] is SeasonPlan
+    assert "in one pass" in client.sent(0)
+    stage_dir = season.paths.stage_dir("story_room_single")
+    final = yaml.safe_load((stage_dir / "season_plan.yaml").read_text("utf-8"))
+    assert final["episodes"][2]["cliff"] == "The stranger says her name, and she runs."
+    assert (stage_dir / "critique.md").exists()
+    assert not (season.paths.stage_dir("story_room") / "season_plan.yaml").exists()
+
+
+def test_single_pass_overwrites_model_written_walls(season, tmp_path, monkeypatch):
+    draft = valid_plan()
+    draft.episodes[0].wall = "late"
+    replies = run_replies(valid_plan(), revised_plan(), findings=[])
+    client = FakeClient(reply(draft), *replies[4:], *compare_replies())
+    use_client(monkeypatch, tmp_path, client)
+    story_room.run_story_room_single(season)
+    assert "must have wall" not in client.sent(4)
+
+
 def test_declined_hard_finding_is_shown_as_unresolved(season, tmp_path, monkeypatch):
     changes = [Change(finding="F1", action="declined", note="The ending works.")]
     client = FakeClient(

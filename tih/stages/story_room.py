@@ -1,10 +1,11 @@
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from tih.llm import LlmContext, ask_json
-from tih.series import load_series
+from tih.series import SeriesConfig, load_series
 from tih.stages.registry import RunContext, Stage, register
 from tih.story.critique import (
     EPISODE_CHECKS,
@@ -36,6 +37,7 @@ from tih.story.season import (
 )
 
 PROMPTS = Path(__file__).parents[2] / "prompts"
+Draft = Callable[[LlmContext, SeriesConfig, str, list[OutlineEntry]], SeasonPlan]
 
 
 class StoryRoomFailed(RuntimeError):
@@ -77,19 +79,9 @@ def _compare(llm: LlmContext, config_block: str, draft: SeasonPlan, revised: Sea
     return votes[0] if votes[0] == votes[1] else "neither clearly"
 
 
-def run_story_room(ctx: RunContext) -> None:
-    series_dir = Path("series") / ctx.paths.series
-    config = load_series(ctx.paths.series)
-    source = (series_dir / "source" / "brief.txt").read_text(encoding="utf-8")
-    record_dir = ctx.paths.stage_dir("record")
-    entries = yaml.safe_load((record_dir / "season_outline.yaml").read_text("utf-8"))
-    outline = [OutlineEntry(**entry) for entry in entries]
-    llm = LlmContext.for_run(ctx.paths)
-
-    config_block = _tag("series_config", _yaml(config.model_dump(mode="json")))
-    source_block = _tag("source", source)
-    base = config_block + source_block
-
+def _draft_staged(
+    llm: LlmContext, config: SeriesConfig, base: str, outline: list[OutlineEntry]
+) -> SeasonPlan:
     spine = ask_json(
         llm,
         "showrunner_spine",
@@ -122,7 +114,49 @@ def run_story_room(ctx: RunContext) -> None:
                 f"The batch for episodes {first} to {last} came back with the wrong episodes"
             )
         details += batch.episodes
-    draft = assemble_plan(spine, details, outline, config)
+    return assemble_plan(spine, details, outline, config)
+
+
+def _draft_single(
+    llm: LlmContext, config: SeriesConfig, base: str, outline: list[OutlineEntry]
+) -> SeasonPlan:
+    plan = ask_json(
+        llm,
+        "showrunner_single",
+        _prompt("showrunner_spine") + "\n" + _prompt("showrunner_episodes"),
+        base
+        + f"Plan the full {config.episodes}-episode season in one pass. You are given the "
+        "guidance for both passes above, and you do both here: work through the spine in "
+        "your head, then return the complete plan with every episode in full detail. "
+        "There are no separate tentpole_endings or endings fields: each episode's turn "
+        "and cliff carry them.",
+        SeasonPlan,
+    )
+    return fix_fields(plan, {entry.number: entry.title for entry in outline}, config)
+
+
+def run_story_room(ctx: RunContext) -> None:
+    _run(ctx, "story_room", _draft_staged)
+
+
+def run_story_room_single(ctx: RunContext) -> None:
+    _run(ctx, "story_room_single", _draft_single)
+
+
+def _run(ctx: RunContext, stage: str, make_draft: Draft) -> None:
+    series_dir = Path("series") / ctx.paths.series
+    config = load_series(ctx.paths.series)
+    source = (series_dir / "source" / "brief.txt").read_text(encoding="utf-8")
+    record_dir = ctx.paths.stage_dir("record")
+    entries = yaml.safe_load((record_dir / "season_outline.yaml").read_text("utf-8"))
+    outline = [OutlineEntry(**entry) for entry in entries]
+    llm = LlmContext.for_run(ctx.paths)
+
+    config_block = _tag("series_config", _yaml(config.model_dump(mode="json")))
+    source_block = _tag("source", source)
+    base = config_block + source_block
+
+    draft = make_draft(llm, config, base, outline)
     titles = {episode.number: episode.title for episode in draft.episodes}
     draft_block = _plan_tag("season_plan", draft)
 
@@ -206,7 +240,7 @@ def run_story_room(ctx: RunContext) -> None:
     open_items = [describe(finding) for finding in unresolved(findings, revision.changes)]
 
     data = plan.model_dump(mode="json")
-    stage_dir = ctx.paths.stage_dir("story_room")
+    stage_dir = ctx.paths.stage_dir(stage)
     (stage_dir / "season_plan.md").write_text(
         render_season_plan(plan, config.title, open_items), encoding="utf-8"
     )
@@ -241,3 +275,6 @@ def run_story_room(ctx: RunContext) -> None:
 
 
 register(Stage(name="story_room", requires=("record",), gate=None, run=run_story_room))
+register(
+    Stage(name="story_room_single", requires=("record",), gate=None, run=run_story_room_single)
+)
