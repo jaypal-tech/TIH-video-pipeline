@@ -1,12 +1,37 @@
 from collections import Counter
+from typing import Literal
 
 from pydantic import BaseModel
 
-from tih.series import SeriesConfig
+from tih.series import CraftTargets, SeriesConfig
 from tih.story.models import Beat, Canon, Episode, Evidence, Line
 from tih.story.season import Violation
 
 PROTECTED = (Evidence.real_words, Evidence.reported)
+WORDS_PER_SECOND = 2.5
+
+
+class Turn(BaseModel):
+    at_s: float
+    beat: str
+    kind: Literal["reveal", "escalation", "refusal", "decision", "threat", "twist", "arrival"]
+    what: str
+
+
+class EpisodeStory(BaseModel):
+    who: str
+    wants: str
+    blocked_by: str
+    turns: list[Turn]
+    question: str
+
+
+class PaceReport(BaseModel):
+    turns: int
+    talk_share: float
+    words_per_line: float
+    places: int
+    longest_silence_s: float
 
 
 class ScriptChange(BaseModel):
@@ -17,6 +42,7 @@ class ScriptChange(BaseModel):
 
 
 class WriterResult(BaseModel):
+    story: EpisodeStory
     changes: list[ScriptChange]
     script: Episode
 
@@ -106,6 +132,61 @@ def check_script(
     return found
 
 
+def pace_report(script: Episode, story: EpisodeStory) -> PaceReport:
+    """Measure the script against short-drama pace. Information only."""
+    lines = [beat for beat in _beats(script) if beat.line]
+    words = [len(beat.line.text.split()) for beat in lines]
+    talk = sum(words) / WORDS_PER_SECOND / script.runtime_s if script.runtime_s else 0
+    starts = [0.0] + [beat.start_s for beat in lines] + [float(script.runtime_s)]
+    return PaceReport(
+        turns=len(story.turns),
+        talk_share=round(talk, 2),
+        words_per_line=round(sum(words) / len(words), 1) if words else 0,
+        places=len({clip.place.split("·")[0].strip() for clip in script.clips}),
+        longest_silence_s=max(b - a for a, b in zip(starts, starts[1:])),
+    )
+
+
+def _timecode(seconds: float) -> str:
+    whole = int(round(seconds))
+    return f"{whole // 60}:{whole % 60:02d}"
+
+
+def _render_story(script: Episode, story: EpisodeStory) -> list[str]:
+    ids = {beat.id for beat in _beats(script)}
+    out = [
+        "## The story",
+        "",
+        f"- **Who:** {story.who}",
+        f"- **Wants:** {story.wants}",
+        f"- **Blocked by:** {story.blocked_by}",
+        "- **Turns:**",
+    ]
+    for number, turn in enumerate(story.turns, start=1):
+        missing = "" if turn.beat in ids else " (beat not found)"
+        out.append(f"  {number}. {_timecode(turn.at_s)} · {turn.kind} · {turn.what}{missing}")
+    out += [f"- **Ending question:** {story.question}", ""]
+    return out
+
+
+def _render_pace(report: PaceReport, targets: CraftTargets | None) -> list[str]:
+    def target(value: str) -> str:
+        return value if targets else "—"
+
+    return [
+        "## Pace",
+        "",
+        "| Measure | Target | This script |",
+        "|---|---|---|",
+        f"| Turns | {target(f'{targets.turns[0]}–{targets.turns[1]}' if targets else '')} | {report.turns} |",
+        f"| Talk time (estimate) | {target(f'{targets.talk_share:.0%}' if targets else '')} | {report.talk_share:.0%} |",
+        f"| Words per line | {target(f'about {targets.words_per_line:g}' if targets else '')} | {report.words_per_line:g} |",
+        f"| Places | {target(f'at most {targets.max_places}' if targets else '')} | {report.places} |",
+        f"| Longest stretch without a line | — | {report.longest_silence_s:g} s |",
+        "",
+    ]
+
+
 def _line(line: Line | None) -> str:
     if line is None:
         return ""
@@ -119,9 +200,18 @@ def _cell(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
-def render_script(script: Episode) -> str:
-    """The script as one readable table per clip."""
+def render_script(
+    script: Episode,
+    story: EpisodeStory | None = None,
+    report: PaceReport | None = None,
+    targets: CraftTargets | None = None,
+) -> str:
+    """The script as one readable table per clip, led by its story and pace."""
     out = [f"# Episode {script.number}: {script.title}", "", f"Runtime: {script.runtime_s} s", ""]
+    if story is not None:
+        out += _render_story(script, story)
+    if report is not None:
+        out += _render_pace(report, targets)
     for clip in script.clips:
         out += [f"### Clip {clip.number} · {clip.place}", "", "| Time | Picture | Line | On screen |", "|---|---|---|---|"]
         for beat in clip.beats:

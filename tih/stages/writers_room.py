@@ -9,7 +9,7 @@ from tih.series import SeriesConfig, load_series
 from tih.stages.registry import RunContext, Stage, register
 from tih.stages.story_room import PROMPTS, _tag, _yaml
 from tih.story.models import Canon, Episode
-from tih.story.script import PROTECTED, WriterResult, check_script, render_script, render_script_changes
+from tih.story.script import PROTECTED, WriterResult, pace_report, check_script, render_script, render_script_changes
 from tih.story.season import SeasonPlan
 
 
@@ -117,7 +117,13 @@ def _run(ctx: RunContext, llm: LlmContext) -> None:
     (stage_dir / "script.yaml").write_text(
         _yaml(result.script.model_dump(mode="json")), encoding="utf-8"
     )
-    (stage_dir / "script.md").write_text(render_script(result.script), encoding="utf-8")
+    report = pace_report(result.script, result.story)
+    (stage_dir / "story.yaml").write_text(
+        _yaml(result.story.model_dump(mode="json")), encoding="utf-8"
+    )
+    (stage_dir / "script.md").write_text(
+        render_script(result.script, result.story, report, config.craft), encoding="utf-8"
+    )
     (stage_dir / "changes.md").write_text(
         render_script_changes(result.script.title, result.changes, draft is not None),
         encoding="utf-8",

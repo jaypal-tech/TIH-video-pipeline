@@ -10,7 +10,7 @@ from tih.stages import writers_room
 from tih.stages.record import run_record
 from tih.stages.registry import RunContext
 from tih.story.models import Episode
-from tih.story.script import ScriptChange, WriterResult
+from tih.story.script import EpisodeStory, ScriptChange, Turn, WriterResult
 
 from test_season import valid_plan
 from test_story_stages import FakeClient, make_llm, reply
@@ -18,6 +18,17 @@ from test_story_stages import FakeClient, make_llm, reply
 ROOT = Path(__file__).parents[1]
 HOOK = "You could hit him from here."
 LAST_SPEECH = "That is the last speech he will ever make."
+
+
+def story(question="Who are the other two targets?") -> EpisodeStory:
+    kinds = ["reveal", "escalation", "refusal", "decision"]
+    return EpisodeStory(
+        who="BOOTH",
+        wants="Powell to shoot tonight.",
+        blocked_by="Powell.",
+        turns=[Turn(at_s=10.0 * i, beat="e1c1b1", kind=k, what=f"Turn {i}.") for i, k in enumerate(kinds)],
+        question=question,
+    )
 
 
 @pytest.fixture
@@ -49,14 +60,14 @@ def sharpened(season, number=1) -> WriterResult:
     beat = next(b for c in script.clips for b in c.beats if b.line and b.line.text == HOOK)
     beat.line.text = "One shot. From here."
     change = ScriptChange(beat=beat.id, before=HOOK, after="One shot. From here.", reason="Sharper hook.")
-    return WriterResult(changes=[change], script=script)
+    return WriterResult(story=story(), changes=[change], script=script)
 
 
 def dropped(season) -> WriterResult:
     script = draft(season).model_copy(deep=True)
     for clip in script.clips:
         clip.beats = [b for b in clip.beats if not (b.line and b.line.text == LAST_SPEECH)]
-    return WriterResult(changes=[], script=script)
+    return WriterResult(story=story("Dropped?"), changes=[], script=script)
 
 
 def run(locked, tmp_path, monkeypatch, *results, number=1):
@@ -98,13 +109,16 @@ def test_writer_with_draft_sends_draft_and_sharpen_instruction(locked, tmp_path,
     saved = Episode(**yaml.safe_load((stage / "script.yaml").read_text("utf-8")))
     assert saved == result.script
     assert "Sharper hook." in (stage / "changes.md").read_text("utf-8")
-    assert "One shot. From here." in (stage / "script.md").read_text("utf-8")
+    page = (stage / "script.md").read_text("utf-8")
+    assert "One shot. From here." in page
+    assert "## The story" in page and "Who are the other two targets?" in page and "## Pace" in page
+    assert (stage / "story.yaml").exists()
     assert roles(llm) == ["writer"]
     assert (tmp_path / "lincoln" / "calls.csv").exists()
 
 
 def test_writer_without_draft_writes_from_plan(locked, tmp_path, monkeypatch):
-    result = WriterResult(changes=[], script=sharpened(locked, number=6).script)
+    result = WriterResult(story=story(), changes=[], script=sharpened(locked, number=6).script)
     client, _, stage = run(locked, tmp_path, monkeypatch, result, number=6)
     sent = client.sent(0)
     assert "<draft_script>" not in sent
@@ -123,7 +137,7 @@ def test_prompt_includes_only_this_episodes_ledger_entries(locked, tmp_path, mon
 
 
 def test_ledger_entries_for_the_episode_are_sent(locked, tmp_path, monkeypatch):
-    result = WriterResult(changes=[], script=draft(locked, 4))
+    result = WriterResult(story=story(), changes=[], script=draft(locked, 4))
     client, _, _ = run(locked, tmp_path, monkeypatch, result, number=4)
     assert "Keep it" in client.sent(0)
 
@@ -139,7 +153,8 @@ def test_violation_triggers_one_repair(locked, tmp_path, monkeypatch):
     client, llm, stage = run(locked, tmp_path, monkeypatch, dropped(locked), sharpened(locked))
     assert roles(llm) == ["writer", "writer_repair"]
     assert "protected_dropped" in client.sent(1)
-    assert (stage / "script.yaml").exists()
+    page = (stage / "script.md").read_text("utf-8")
+    assert "Who are the other two targets?" in page and "Dropped?" not in page
 
 
 def test_repair_still_failing_stops_without_script(locked, tmp_path, monkeypatch):

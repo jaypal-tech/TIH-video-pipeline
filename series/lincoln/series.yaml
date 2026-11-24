@@ -47,3 +47,8 @@ script_notes:
     - The source calls who was in the room an 'accounts say', but the scene shows all four men as fact.
     - The final twist lands 10 seconds before the end. The benchmark is 5 to 8 seconds.
     - This draft opens on a new scene rather than the previous cliff. Add a one-second echo, or say why not.
+craft:
+  turns: [4, 5]
+  talk_share: 0.55
+  words_per_line: 5
+  max_places: 2

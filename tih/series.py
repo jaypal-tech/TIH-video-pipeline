@@ -11,6 +11,15 @@ class KnowledgeRule(BaseModel):
     not_before: int
 
 
+class CraftTargets(BaseModel):
+    """Short-drama pace targets a series aims for. Reported, never enforced."""
+
+    turns: tuple[int, int]
+    talk_share: float
+    words_per_line: float
+    max_places: int
+
+
 class SeriesConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -27,6 +36,7 @@ class SeriesConfig(BaseModel):
     source_format: Literal["table_script", "freeform"] = "freeform"
     runtime_s: tuple[int, int] = (60, 90)
     script_notes: dict[int, list[str]] = Field(default_factory=dict)
+    craft: CraftTargets | None = None
 
 
 def load_series(name: str) -> SeriesConfig:

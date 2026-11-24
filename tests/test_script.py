@@ -4,11 +4,19 @@ import pytest
 import yaml
 
 from tih.paths import RunPaths
-from tih.series import SeriesConfig
+from tih.series import CraftTargets, SeriesConfig, load_series
 from tih.stages.record import run_record
 from tih.stages.registry import RunContext
 from tih.story.models import Beat, Canon, Clip, Episode, Evidence, Line
-from tih.story.script import ScriptChange, check_script, render_script, render_script_changes
+from tih.story.script import (
+    EpisodeStory,
+    ScriptChange,
+    Turn,
+    check_script,
+    pace_report,
+    render_script,
+    render_script_changes,
+)
 
 ROOT = Path(__file__).parents[1]
 LAST_SPEECH = "That is the last speech he will ever make."
@@ -183,3 +191,72 @@ def test_clip_without_beats_is_a_violation(record):
     script = draft.model_copy(deep=True)
     script.clips[1].beats = []
     assert rules(check_script(script, 1, canon, CONFIG, None)) == ["empty"]
+
+
+def story_of(turns=3, question="Who are the other two targets?"):
+    kinds = ["reveal", "escalation", "refusal", "decision", "twist"]
+    return EpisodeStory(
+        who="BOOTH",
+        wants="Powell to shoot the President tonight.",
+        blocked_by="Powell, and the crowd.",
+        turns=[Turn(at_s=10.0 * i, beat="e1c1b1", kind=kinds[i], what=f"Turn {i}.") for i in range(turns)],
+        question=question,
+    )
+
+
+TARGETS = CraftTargets(turns=(4, 5), talk_share=0.55, words_per_line=5, max_places=2)
+
+
+def test_pace_report_counts_episode_one(record):
+    draft, _ = record
+    report = pace_report(draft, story_of(3))
+    assert report.turns == 3
+    assert report.places == 4
+    assert report.longest_silence_s >= 9
+    assert 0 < report.talk_share < 1
+
+
+def test_pace_report_without_targets(record):
+    draft, _ = record
+    story = story_of()
+    page = render_script(draft, story, pace_report(draft, story), None)
+    assert "| Turns | — |" in page
+
+
+def test_pace_report_with_no_lines(record):
+    draft, _ = record
+    script = draft.model_copy(deep=True)
+    for beat in beats(script):
+        beat.line = None
+    report = pace_report(script, story_of())
+    assert report.talk_share == 0 and report.words_per_line == 0
+
+
+def test_places_ignore_time_suffix(record):
+    draft, _ = record
+    script = draft.model_copy(deep=True)
+    script.clips[0].place = "The lawn · night"
+    script.clips[1].place = "The lawn"
+    for clip in script.clips[2:]:
+        clip.place = "The lawn, at dawn"
+    assert pace_report(script, story_of()).places == 2
+
+
+def test_render_script_opens_with_story_and_pace(record):
+    draft, _ = record
+    story = story_of(4)
+    page = render_script(draft, story, pace_report(draft, story), TARGETS)
+    assert page.index("## The story") < page.index("## Pace") < page.index("### Clip 1")
+    assert "Who are the other two targets?" in page
+    assert "4–5" in page and "55%" in page
+
+
+def test_story_turn_with_unknown_beat_is_marked(record):
+    draft, _ = record
+    story = story_of(1)
+    story.turns[0].beat = "nope"
+    assert "(beat not found)" in render_script(draft, story, pace_report(draft, story), TARGETS)
+
+
+def test_lincoln_series_has_craft_targets():
+    assert load_series("lincoln").craft.turns == (4, 5)
