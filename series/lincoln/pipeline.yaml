@@ -89,6 +89,7 @@ steps:
     endpoint: bytedance/seedance-2.0/text-to-video
     estimate_usd: 4.60 # the 15 s maximum at $0.3034/s, rounded up
     takes: 2 # a second take only if the first fails the word check
+    parallel: 4 # takes are independent, so four render at once (each waits 4-5 min at fal)
     duration_range: [4, 15]
     arguments:
       prompt: "{prompt_seedance}"

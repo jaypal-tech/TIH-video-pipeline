@@ -1,9 +1,10 @@
 """Stage: cut_<flow>. Edit, mix, title and check the episode. Free (local ffmpeg).
 
-1. Picture: the opening take, darkened and blurred, for OPENING_SECONDS, then
-   each scene take trimmed to its planned length (the model returns whole
-   seconds), scaled to 1080x1920, with slow motion and freezes applied to
-   single-shot takes, joined in order.
+1. Picture: the opening take, lightly dimmed, for OPENING_SECONDS, then
+   each scene take trimmed to its played length (its plan, or longer when the
+   model spoke past it, up to the clip's end; see `as_shot`), scaled to
+   1080x1920, with slow motion and freezes applied to single-shot takes,
+   joined in order.
 2. Dialogue: each take's own sound starts with its take, is mixed into one
    stem and normalised to -16 LUFS in two passes.
 3. Music and effects: each cue at its time and level, ducked under speech.
@@ -25,7 +26,7 @@ from tih.media.overlays import Text, drawtext_filters, opening_title
 from tih.media.overlays import filters as overlay_filters
 from tih.production import load_resolved, read_takes
 from tih.scenes import (
-    OPENING_ID, OPENING_SECONDS, Caption, Flow, SceneTake, opening_take, retimed, scene_takes, shifted,
+    OPENING_ID, OPENING_SECONDS, Caption, Flow, SceneTake, as_shot, opening_take, retimed, scene_takes, shifted,
 )
 from tih.series import load_series
 from tih.shots import ResolvedPlan
@@ -36,7 +37,7 @@ from tih.story.models import Episode
 
 SAMPLE_RATE = 48000
 FLASH_SECONDS = 0.5
-OPENING_LOOK = "eq=brightness=-0.25:saturation=0.6,gblur=sigma=6"
+OPENING_LOOK = "eq=brightness=-0.06:saturation=0.9"  # lightly dimmed under the title, still clearly visible
 TAKE_FADE = 0.05  # seconds faded in and out at each take's edges; a take's last word may end 0.1 s before its end
 
 
@@ -233,16 +234,19 @@ def title_lines(ctx: RunContext, plan: ResolvedPlan) -> list[str]:
 
 
 def run_cut(ctx: RunContext, flow: Flow) -> None:
-    plan = load_resolved(ctx)
+    planned = load_resolved(ctx)
     bible = load_bible(ctx.paths.series)
     low, high = load_series(ctx.paths.series).runtime_s
     stage_dir = ctx.paths.stage_dir(f"cut_{flow}")
     work = stage_dir / "work"
+    spans, captions, played = read_timing(ctx, flow)
+    # the edit follows the clips: a take the model spoke past its plan plays longer
+    plan = as_shot(planned, scene_takes(planned, flow), played)
+    extra = plan.runtime_s - planned.runtime_s
     timeline = shifted(plan, OPENING_SECONDS)
     picture, edl = _picture(ctx, plan, flow, work)
     mix, loudness = _sound(ctx, plan, flow, work)
 
-    spans, captions = read_timing(ctx, flow)
     shown = without_title_super(shifted(retimed(plan, scene_takes(plan, flow), spans), OPENING_SECONDS))
     pages = [c.model_copy(update={"start": c.start + OPENING_SECONDS, "end": c.end + OPENING_SECONDS})
              for c in captions]
@@ -261,7 +265,7 @@ def run_cut(ctx: RunContext, flow: Flow) -> None:
         "-movflags", "+faststart", str(final),
     ])
 
-    problems = ffmpeg.validate_master(final, min_s=low, max_s=high + OPENING_SECONDS)
+    problems = ffmpeg.validate_master(final, min_s=low, max_s=high + OPENING_SECONDS + extra)
     (stage_dir / "edl.yaml").write_text(yaml.safe_dump(edl, sort_keys=False), encoding="utf-8")
     report = {
         "runtime_s": ffmpeg.duration(final),

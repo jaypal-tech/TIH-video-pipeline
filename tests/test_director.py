@@ -145,8 +145,16 @@ def test_director_prompt_carries_scene_staging_rules():
     assert "about 6 words" in text
     assert "On a shot where a face speaks, the camera holds still: no push in, no pan." in text
     assert "`opening` is required." in text
-    assert "No shot is shorter than 1.5 seconds." in text
-    assert "Every shot runs 1.5 to 8.0 seconds." in text
+    assert "No shot is shorter than 1.5 seconds." not in text
+    assert "1.5 to 8.0 seconds" not in text and "mostly 1.5 to 4 seconds" not in text
+    assert ("Each clip is ONE continuous generation of 10 to 15 seconds holding 3 or 4 shots, never more than 4. "
+            "An episode has 5 to 7 clips.") in text
+    assert ("Every shot runs 3 to 7 seconds. A shot with a line lasts at least the line's words / 2.5 plus "
+            "1.5 seconds.") in text
+    assert "a shot has at most ONE cast member whose face is seen" in text
+    assert "WIDE, MEDIUM and POV shots show the crowd, the building or a room and have no cast member's face." in text
+    assert "No TWO shots." in text
+    assert "a head taller" in text and "Never describe relative body size" in text
     for phrase in (
         "`keyframe` states where each person is in the frame (left, centre, right; near or far) and where they stand relative to each other. Keep those positions the same in every shot of the scene.",
         "`motion` gives the expression and the intent behind the line in a few words (for example: jaw tight, he says it like a dare). When a shot has a line, the person starts speaking as the shot begins.",

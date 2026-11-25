@@ -11,7 +11,7 @@ import re
 from typing import TYPE_CHECKING, Callable
 
 from tih.bible import TOKEN, Bible, Character, Place
-from tih.shots import Cue, Opening, ResolvedShot
+from tih.shots import Cue, Opening, ResolvedShot, SceneRule
 
 if TYPE_CHECKING:  # tih.scenes imports tih.stages.voice, which imports this module
     from tih.scenes import SceneTake
@@ -285,11 +285,16 @@ def _speaker(shot: ResolvedShot, bible: Bible) -> Character:
     return bible.characters[shot.speaker if shot.speaker in bible.characters else shot.cast[0]]
 
 
-def _seedance_shot(number: int, start: float, end: float, shot: ResolvedShot, bible: Bible) -> str:
+def _seedance_shot(
+    number: int, start: float, end: float, shot: ResolvedShot, bible: Bible, setting: str | None = None
+) -> str:
+    """One shot's paragraph; `setting` opens it when the take's shots are not all in one place."""
     def name(cid: str) -> str:
         return _screen_name(bible.characters[cid])
 
     header = f"Shot {number} ({_seconds(start)}-{_seconds(end)}s, {SIZE_WORDS[shot.size]}, {shot.lens_mm}mm lens):"
+    if setting is not None:
+        header += f" Setting: {_sentence(setting)}"
     who = [f"{name(cid)} - {_scene_text(bible.characters[cid])}." for cid in shot.cast]
     action = [_tokens(_setting_words(text, bible, "this setting"), bible, name) for text in (shot.keyframe, shot.motion)]
     if shot.line:
@@ -303,25 +308,30 @@ def _seedance_shot(number: int, start: float, end: float, shot: ResolvedShot, bi
     return " ".join([header, *who, *action, ending])
 
 
+def _seedance_setting(place: Place, rule: SceneRule | None) -> str:
+    """A place as the video model should see it: its film wording, else its look, weather and light."""
+    if place.scene_look:
+        return _plain(place.scene_look)
+    return " ".join(part for part in (
+        _sentence(_plain(place.look)),
+        _sentence(_plain(rule.weather)) if rule else "",
+        _sentence(_plain(rule.light)) if rule else "",
+    ) if part)
+
+
 def _seedance_scene(take: "SceneTake", bible: Bible) -> str:
     shots = take.shots
     style = _plain(bible.style.scene_look or bible.style.look)
     count = f"{COUNT_WORDS[len(shots)]} shots with hard cuts between them, " if len(shots) > 1 else "One continuous shot, no cuts, "
-    place = bible.places[take.place]
-    if place.scene_look:
-        setting = _plain(place.scene_look)
-    else:
-        rule = shots[0].scene
-        setting = " ".join(part for part in (
-            _sentence(_plain(place.look)),
-            _sentence(_plain(rule.weather)) if rule else "",
-            _sentence(_plain(rule.light)) if rule else "",
-        ) if part)
-    paragraphs = [count + style, "Setting for every shot: " + setting]
+    one_place = len({shot.place for shot in shots}) <= 1
+    paragraphs = [count + style]
+    if one_place:
+        paragraphs.append("Setting: " + _seedance_setting(bible.places[take.place], shots[0].scene))
     clock = 0.0
     for number, shot in enumerate(shots, start=1):
         start, clock = clock, clock + shot.duration
-        paragraphs.append(_seedance_shot(number, start, clock, shot, bible))
+        setting = None if one_place else _seedance_setting(bible.places[shot.place], shot.scene)
+        paragraphs.append(_seedance_shot(number, start, clock, shot, bible, setting))
     voices = []
     for shot in shots:
         if shot.line:

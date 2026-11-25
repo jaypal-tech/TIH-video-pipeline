@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from test_production import _plan_with, _staged, episode_one  # noqa: F401  episode_one is a fixture
+from test_production import FILM_PLAN, _plan_with, _staged, episode_one  # noqa: F401  episode_one is a fixture
 
 from tih.cli import rehearse_episode
 
@@ -249,7 +249,7 @@ def test_all_parts_conformed(tmp_path, monkeypatch):
     monkeypatch.chdir(ROOT)
     source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
     run_stage(source, "record")
-    _staged(source)
+    _staged(source, FILM_PLAN)
     ctx = rehearse_episode(1, "lincoln", tmp_path / "dry", source=tmp_path / "src")
     parts = sorted((ctx.paths.scope_dir / "cut_seedance" / "work" / "takes").glob("*.mp4"))
     assert parts

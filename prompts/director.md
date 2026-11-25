@@ -33,14 +33,18 @@ You receive the series config, the series bible (characters, places, props, moti
 - Never cut between two shots with the same size and the same cast: that is a jump cut. Change size or angle, or cut to the listener.
 - Cut to the listener's reaction; don't hold more than 4 shots in a row on one face.
 - Open a new place on a WIDE or MEDIUM within its first 2 shots, so we know where we are.
-- Every shot runs 1.5 to 8.0 seconds.
+- Each clip is ONE continuous generation of 10 to 15 seconds holding 3 or 4 shots, never more than 4. An episode has 5 to 7 clips.
+- Every shot runs 3 to 7 seconds. A shot with a line lasts at least the line's words / 2.5 plus 1.5 seconds.
 
 ## Pace for a phone
 
 - The first 3 seconds hook: a face, a line, a threat.
-- Shots are mostly 1.5 to 4 seconds. Cut to the listener's reaction; keep the two faces in conflict on screen.
+- Cut to the listener's reaction; keep the two faces in conflict on screen, one face per shot.
 - Use close sizes (CU, MCU) for faces and a wide only to place us.
-- No shot is shorter than 1.5 seconds.
+- A named character (anyone in `cast`) is framed MCU, CU, ECU or INSERT, and a shot has at most ONE cast member whose face is seen. A second person is off frame, a back, or a shoulder, and is not described.
+- WIDE, MEDIUM and POV shots show the crowd, the building or a room and have no cast member's face. A `face_reference: false` character may appear in them only as a distant figure or from behind.
+- No TWO shots.
+- Never describe relative body size ("a head taller", "smaller than").
 - Hold the final card long enough to read, and freeze or flash where the script's ending calls for it.
 - The durations add up to the script's `runtime_s`, inside the series runtime range.
 - `opening` is required. Write `opening`: one silent 5-second wide establishing shot that the title sits over. Give `place` (the view that shows where we are, with the crowd or people seen from behind if they are watching something), `keyframe` (what is seen and what people are doing: real movement, not a still), `motion` (how the people move and one slow camera move) and `sound` (three to five specific sounds from the scene, no music). Nobody speaks in it. It is not one of the numbered shots.

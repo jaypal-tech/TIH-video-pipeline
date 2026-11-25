@@ -1,15 +1,23 @@
+import json
+import os
 import shutil
+import threading
+import time
+from collections import Counter
 from pathlib import Path
 
 import pytest
 import yaml
 
 from tih.cli import prepare_rehearsal
-from tih.production import NoUsableTake, load_resolved, read_takes
+from tih.ledger import Ledger
+from tih.production import NoUsableTake, load_pipeline, load_resolved, read_takes
+from tih.media import ffmpeg
 from tih.scenes import (
-    CAPTION_TAIL, CAPTION_WORDS, FLOWS, MAX_TAKE_SECONDS, MAX_TAKE_SHOTS, SceneTake, caption_pages,
-    line_spans, opening_take, request_seconds, retimed, scene_takes, shifted,
+    CAPTION_TAIL, CAPTION_WORDS, FLOWS, MAX_TAKE_SECONDS, MAX_TAKE_SHOTS, OPENING_SECONDS, SceneTake, as_shot,
+    caption_pages, line_spans, opening_take, request_seconds, retimed, scene_takes, shifted,
 )
+from tih.series import load_series
 from tih.paths import RunPaths
 from tih.providers.fal import ProviderError
 from tih.shots import (
@@ -19,12 +27,13 @@ from tih.stages import record as _record  # noqa: F401  registers the stage
 from tih.stages import registry
 from tih.stages import scenes as scenes_stage
 from tih.stages.registry import RunContext, run_stage
-from tih.stages.scenes import check_take, read_timing, run_scenes
+from tih.stages.scenes import MAX_TAIL, check_take, played_length, read_timing, run_scenes
 from tih.stages.voice import word_difference
 from tih.story.models import Episode
 from tih.bible import load_bible
 
 ROOT = Path(__file__).parents[1]
+FILM_PLAN = ROOT / "tests" / "fixtures" / "film_plan.yaml"  # one generation per clip, as the first film
 
 
 @pytest.fixture(autouse=True)
@@ -53,15 +62,25 @@ def test_seedance_film_wording_is_in_the_bible():
     assert bible.style.scene_look.endswith("Wholly original, invented faces.")
     assert [bible.characters[c].screen_name for c in ("booth", "powell", "lincoln", "tad")] == [
         "THE ACTOR", "THE SOLDIER", "THE PRESIDENT", "THE BOY"]
-    assert bible.characters["booth"].scene_look.startswith("a 26-year-old man of compact build, jet-black curly hair to the collar")
-    assert bible.characters["powell"].scene_look.endswith("buttoned to the neck over a collarless grey shirt")
-    assert "four black cloth-covered buttons" in bible.characters["booth"].scene_look
-    assert "no hat" in bible.characters["lincoln"].scene_look and "no hat" in bible.characters["tad"].scene_look
+    assert bible.characters["booth"].scene_look == (
+        "a 26-year-old man, jet-black curly hair to the collar, long sideburns, a thick black "
+        "handlebar moustache with upturned ends, dark eyes under heavy brows, pale handsome face, a black "
+        "flat-crowned wide-brimmed hat, a white high collar with a black silk cravat, a dark wool frock coat "
+        "with a dark velvet collar, dark leather gloves")
+    assert bible.characters["powell"].scene_look == (
+        "a 20-year-old man, very tall and broad-shouldered, a clean-shaven ruddy boyish face with a square jaw, "
+        "short brown hair, a flat unblinking stare, a grey wool forage cap with a short black leather visor, "
+        "a plain dark wool sack coat buttoned over a collarless grey shirt")
+    assert bible.characters["lincoln"].scene_look == (
+        "a 56-year-old man, very tall and gaunt, a deeply lined hollow-cheeked face, a dark chin beard with no "
+        "moustache, dark tousled hair, a black frock coat, a white shirt and a black bow tie")
+    assert bible.characters["tad"].scene_look == "a 12-year-old boy with dark hair, a small dark wool jacket and a white collar"
     assert bible.characters["lincoln"].scene_voice.startswith("a high, clear, reedy tenor")
     assert bible.places["L1"].scene_look.startswith(
         "an open lawn at night in April 1865, steady drizzle, seen from behind")
-    assert "no building is in frame" in bible.places["L1R"].scene_look
-    assert "mansion" not in bible.places["L1R"].scene_look
+    assert "fading into black night and rain" in bible.places["L1R"].scene_look
+    assert not {"window", "house", "mansion", "building"} & set(
+        bible.places["L1R"].scene_look.lower().replace(",", " ").replace(".", " ").split())
     assert bible.places["L2"].scene_look.startswith("a tall open second-floor sash window")
 
 
@@ -93,10 +112,15 @@ def test_seedance_flow_packs_shots_within_one_clip(plan):
         assert {s.clip for s in take.shots} == {take.clip}
 
 
-def test_seedance_take_never_mixes_places(plan):
+def test_seedance_take_may_change_place_within_its_clip(plan):
     takes = scene_takes(plan, "seedance")
     for take in takes:
-        assert {s.place for s in take.shots} == {take.place}
+        assert take.place == take.shots[0].place
+    # one conversation is one generation, even when the camera turns to another view
+    moved = [s.model_copy(update={"place": "L1R"}) if i % 2 else s for i, s in enumerate(plan.shots)]
+    turned = scene_takes(plan.model_copy(update={"shots": moved}), "seedance")
+    assert [t.id for t in turned] == [t.id for t in takes]
+    assert any(len({s.place for s in t.shots}) > 1 for t in turned)
     for clip in {t.clip for t in takes}:
         assert [t.id for t in takes if t.clip == clip] == [
             f"{clip}.{n}" for n in range(1, 1 + len([t for t in takes if t.clip == clip]))]
@@ -261,29 +285,29 @@ def test_hyphenated_word_counts_as_one_caption_word(plan):
 
 def test_wrong_word_is_rejected(plan):
     take = _talking_take(plan, ["Go on.", "I'm listening."])
-    assert "expected" in check_take(take, "Go on. I am listening.", GO_ON)
+    assert "expected" in check_take(take, "Go on. I am listening.", GO_ON, take.duration)
 
 
 def test_silent_take_with_speech_is_rejected(plan):
-    assert check_take(opening_take(plan), "You could hit him from here.", []).startswith("unexpected speech")
+    assert check_take(opening_take(plan), "You could hit him from here.", [], 5.0).startswith("unexpected speech")
 
 
 def test_silent_take_with_no_speech_passes(plan):
-    assert check_take(opening_take(plan), "", []) is None
+    assert check_take(opening_take(plan), "", [], 5.0) is None
 
 
 def test_line_past_the_take_is_rejected(plan):
     take = _talking_take(plan, ["Go on.", "I'm listening."])
     late = [_word(w, 0.0, take.duration + 0.5) for w in ["Go", "on.", "I'm", "listening."]]
-    assert check_take(take, "Go on. I'm listening.", late) == "line runs past the take"
+    assert check_take(take, "Go on. I'm listening.", late, take.duration) == "line runs past the take"
 
 
 def test_matching_take_passes(plan):
     take = _talking_take(plan, ["Go on.", "I'm listening."])
-    assert check_take(take, "Go on. I'm listening.", GO_ON) is None
+    assert check_take(take, "Go on. I'm listening.", GO_ON, take.duration) is None
 
 
-def _staged(tmp_path, monkeypatch, opening=None):
+def _staged(tmp_path, monkeypatch, opening=None, plan_file=FILM_PLAN):
     """What `tih rehearse` builds before its paid stages: script and plan, approvals, locks."""
     source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
     run_stage(source, "record")
@@ -291,7 +315,7 @@ def _staged(tmp_path, monkeypatch, opening=None):
     (scope / "writers_room").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(scope / "record" / "script.yaml", scope / "writers_room" / "script.yaml")
     plan_path(source.paths).parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(example_plan_path("lincoln"), plan_path(source.paths))
+    shutil.copyfile(plan_file, plan_path(source.paths))
     if opening is not None:
         data = yaml.safe_load(plan_path(source.paths).read_text(encoding="utf-8"))
         data["opening"] = opening.model_dump(mode="json")
@@ -338,7 +362,7 @@ def test_every_take_is_chosen_and_every_line_is_timed(staged_ctx, flow):
     assert set(takes) == {"0", *(t.id for t in scene_takes(plan, flow))}
     assert all(t.chosen for t in takes.values())
     assert all(len(t.takes) == 1 for t in takes.values())  # every dry take says its words at once
-    spans, captions = read_timing(staged_ctx, flow)
+    spans, captions, _ = read_timing(staged_ctx, flow)
     assert set(spans) == {s.id for s in plan.shots if s.line}
     assert " ".join(c.text for c in captions) == " ".join(s.line for s in plan.shots if s.line)
 
@@ -467,7 +491,7 @@ def test_sound_events_around_a_correct_line_pass(staged_ctx, monkeypatch):
     run_scenes(staged_ctx, "seedance")
     takes = read_takes(staged_ctx, "scenes_seedance")
     assert all(len(t.takes) == 1 and t.takes[0].reason is None for t in takes.values())
-    spans, captions = read_timing(staged_ctx, "seedance")
+    spans, captions, _ = read_timing(staged_ctx, "seedance")
     assert "(wind" not in " ".join(c.text for c in captions)
 
 
@@ -554,7 +578,7 @@ def test_take_whose_words_cannot_be_timed_is_rejected(staged_ctx, monkeypatch):
     chosen = read_takes(staged_ctx, "scenes_seedance")[failed[0]]
     assert [t.reason for t in chosen.takes] == [
         "words could not be timed: script has 15 words, timings have 14", None]
-    spans, _ = read_timing(staged_ctx, "seedance")
+    spans, _, _ = read_timing(staged_ctx, "seedance")
     assert set(spans) == {s.id for s in load_resolved(staged_ctx).shots if s.line}
 
 
@@ -564,3 +588,330 @@ def test_running_the_stage_again_costs_nothing(staged_ctx):
     before = [(r.call_id, r.cost_usd) for r in ledger.current()]
     run_scenes(staged_ctx, "seedance")
     assert [(r.call_id, r.cost_usd) for r in ledger.current()] == before
+
+
+# --- takes in parallel ---
+
+def _pin_parallel(monkeypatch, workers):
+    """Run the scenes stage with `workers` takes at once, whatever pipeline.yaml says."""
+    def pinned(series):
+        config = load_pipeline(series)
+        step = config.steps["scene_seedance"]
+        config.steps["scene_seedance"] = step.model_copy(update={"parallel": workers})
+        return config
+
+    monkeypatch.setattr(scenes_stage, "load_pipeline", pinned)
+
+
+@pytest.fixture(autouse=True)
+def one_take_at_a_time(monkeypatch):
+    """The tests above expect the opening to be taken first; the tests below ask for more."""
+    _pin_parallel(monkeypatch, 1)
+
+
+def test_pipeline_runs_four_scene_takes_at_once():
+    steps = load_pipeline("lincoln").steps
+    assert steps["scene_seedance"].parallel == 4
+    assert steps["transcribe"].parallel == 1
+
+
+def _ledger_rows(ctx):
+    """Each call's step, shot, take, cost and outcome. Placeholder silent takes of one length
+    sound identical, so they share one transcript call; which take asks first, and so names it,
+    depends on timing when takes run at once. The count and cost of those calls must still match."""
+    return Counter((r.step, None if r.step == "transcribe" else str(r.shot), r.settings.get("take"),
+                    r.cost_usd, r.status, r.kept)
+                   for r in ctx.gateway.ledger.current())
+
+
+def _stage_files(ctx, root):
+    """takes.yaml with call ids and the run's root made comparable, and timing.yaml as written."""
+    stage_dir = ctx.paths.scope_dir / "scenes_seedance"
+    takes = (stage_dir / "takes.yaml").read_text(encoding="utf-8").replace(str(root), "ROOT")
+    for record in ctx.gateway.ledger.current():
+        takes = takes.replace(record.call_id, f"{record.step}:{record.shot}:{record.settings.get('take')}")
+    return takes, (stage_dir / "timing.yaml").read_text(encoding="utf-8")
+
+
+def test_parallel_run_writes_what_a_sequential_run_writes(tmp_path, monkeypatch):
+    one = _staged(tmp_path / "one", monkeypatch)
+    run_scenes(one, "seedance")
+    four = _staged(tmp_path / "four", monkeypatch)
+    _pin_parallel(monkeypatch, 4)
+    run_scenes(four, "seedance")
+    assert _stage_files(four, tmp_path / "four") == _stage_files(one, tmp_path / "one")
+    assert _ledger_rows(four) == _ledger_rows(one)
+
+
+def _scene_kind(endpoint):
+    return "text-to-video" in endpoint
+
+
+def test_takes_overlap_the_ledger_stays_whole_and_a_rerun_is_free(staged_ctx, monkeypatch):
+    _pin_parallel(monkeypatch, 4)
+    transport = staged_ctx.gateway.transport
+    wait, lock = transport.wait, threading.Lock()
+    waiting, peak = [0], [0]
+
+    def slow_wait(endpoint, request_id):
+        if not _scene_kind(endpoint):
+            return wait(endpoint, request_id)
+        with lock:
+            waiting[0] += 1
+            peak[0] = max(peak[0], waiting[0])
+        try:
+            time.sleep(0.3)
+            return wait(endpoint, request_id)
+        finally:
+            with lock:
+                waiting[0] -= 1
+
+    monkeypatch.setattr(transport, "wait", slow_wait)
+    run_scenes(staged_ctx, "seedance")
+    assert 1 < peak[0] <= 4
+
+    ledger_file = staged_ctx.gateway.ledger.path
+    raw = ledger_file.read_bytes()
+    assert raw.endswith(b"\n")
+    assert all(isinstance(json.loads(line), dict) for line in raw.decode("utf-8").splitlines())
+    assert all(isinstance(url, str) for url in json.loads(
+        (staged_ctx.paths.root / "lincoln" / "uploads.json").read_text(encoding="utf-8")).values())
+
+    ledger = Ledger(ledger_file)  # a fresh read of the file, not the run's object
+    before = sorted((r.call_id, r.cost_usd) for r in ledger.current())
+    run_scenes(staged_ctx, "seedance")
+    assert sorted((r.call_id, r.cost_usd) for r in ledger.current()) == before
+
+
+def _take_dir(take_id):
+    return f"shotseedance-take{take_id.replace('.', '_')}{os.sep}"
+
+
+def test_a_take_with_no_usable_attempt_lets_the_others_finish(staged_ctx, monkeypatch):
+    _pin_parallel(monkeypatch, 4)
+    plan = load_resolved(staged_ctx)
+    scenes = [opening_take(plan), *scene_takes(plan, "seedance")]
+    target = next(t for t in scenes[4:] if t.line)
+    transport = staged_ctx.gateway.transport
+    wait = transport.wait
+
+    def deaf_wait(endpoint, request_id):
+        if "speech-to-text" in endpoint:
+            audio = str(transport.uploads[str(transport.requests[request_id][1]["audio_url"])])
+            if _take_dir(target.id) in audio:
+                raise ProviderError("scribe is down", status_code=503)
+        return wait(endpoint, request_id)
+
+    monkeypatch.setattr(transport, "wait", deaf_wait)
+    with pytest.raises(NoUsableTake, match=f" {target.id}: "):
+        run_scenes(staged_ctx, "seedance")
+
+    ledger = staged_ctx.gateway.ledger
+    started = [t for t in scenes if _scene_calls(staged_ctx, t.id)]
+    assert started == scenes[:len(started)]  # takes start in plan order; none after a gap
+    assert target in started
+    for take in started:
+        kept = [r.kept for r in _scene_calls(staged_ctx, take.id)]
+        if take is target:
+            assert kept == [None, None]  # no take was chosen, so neither is marked
+        else:
+            assert kept == [True]
+    print(f"failure run: {len(started)} of {len(scenes)} takes started")
+
+    monkeypatch.setattr(transport, "wait", wait)
+    before = {r.call_id for r in ledger.current()}
+    run_scenes(staged_ctx, "seedance")
+    new = [r for r in ledger.current() if r.call_id not in before]
+    unstarted = {f"seedance-take{t.id}" for t in scenes if t not in started}
+    assert [(r.step, r.settings["take"]) for r in new if r.shot == f"seedance-take{target.id}"] == [
+        ("transcribe", 0)]
+    assert {r.shot for r in new} - {f"seedance-take{target.id}"} == unstarted
+    print(f"re-run: {len(new)} new calls, ${sum(r.cost_usd or 0 for r in new):.2f}; "
+          f"{len(unstarted)} unstarted takes plus the failed take's transcript")
+    assert all(t.chosen for t in read_takes(staged_ctx, "scenes_seedance").values())
+
+
+# --- a take plays as long as its words need, up to its clip's end ---
+
+def _late_words(take, last_end):
+    """Its line's words, spread evenly so the last one ends at `last_end`."""
+    tokens = take.line.split()
+    step = last_end / len(tokens)
+    return [_word(token, round(i * step, 3), round((i + 1) * step, 3)) for i, token in enumerate(tokens)]
+
+
+def test_line_may_run_past_the_plan_but_not_past_the_clip(plan):
+    take = _talking_take(plan, ["You could hit him from here.", "Not in this crowd."], duration=5.5)
+    assert check_take(take, take.line, _late_words(take, 5.74), 6.0) is None
+    assert check_take(take, take.line, _late_words(take, 5.95), 6.0) == "line runs past the take"
+
+
+def test_a_take_plays_its_whole_clip_up_to_a_tail(plan):
+    take = _talking_take(plan, ["You could hit him from here."], duration=5.5)
+    assert played_length(take, 6.0) == 6.0
+    assert played_length(take, 6.08) == 6.08
+    assert played_length(take, 9.0) == 5.5 + MAX_TAIL == 7.0  # a long tail is not kept
+    assert played_length(take, 5.47) == 5.5  # within the short-clip tolerance: never shorter than planned
+    silent = next(t for t in scene_takes(plan, "seedance") if not t.line and len(t.shots) > 1)
+    assert played_length(silent, silent.duration + 0.5) == silent.duration + 0.5  # words or not
+    full = _talking_take(plan, ["Go on."], duration=MAX_TAKE_SECONDS)
+    assert played_length(full, 15.08) == MAX_TAKE_SECONDS  # a take never outgrows one generation
+
+
+def test_opening_and_slowed_or_frozen_takes_play_their_plan(plan):
+    opening = opening_take(plan)
+    assert played_length(opening, 6.08) == opening.duration
+    alone = [t for t in scene_takes(plan, "seedance")
+             if any(s.speed != 1.0 or s.freeze_at is not None for s in t.shots)]
+    assert alone
+    assert all(played_length(t, t.duration + 1.0) == t.duration for t in alone)
+    silent = next(t for t in scene_takes(plan, "seedance") if not t.line)
+    assert as_shot(plan, scene_takes(plan, "seedance"), {silent.id: silent.duration}) == plan
+
+
+def test_as_shot_lengthens_last_shots_and_moves_what_follows(plan):
+    takes = scene_takes(plan, "seedance")
+    first, later = takes[0], next(t for t in takes if t.id == "3.1")
+    played = {first.id: first.duration + 0.4, later.id: later.duration + 0.3}
+    shot = as_shot(plan, takes, played)
+    assert shot.runtime_s == pytest.approx(plan.runtime_s + 0.7)
+    planned = {s.id: s for s in plan.shots}
+    first_end, later_end = first.start_s + first.duration, later.start_s + later.duration
+    for moved in shot.shots:
+        was = planned[moved.id]
+        before = 0.0 if was.start_s < first_end else 0.4 if was.start_s < later_end else 0.7
+        assert moved.start_s == pytest.approx(was.start_s + before)
+        grown = 0.4 if moved.id == first.shots[-1].id else 0.3 if moved.id == later.shots[-1].id else 0.0
+        assert moved.duration == pytest.approx(was.duration + grown)
+    for moved, was in zip(shot.cues, plan.cues):
+        expected = 0.0 if was.at < first_end else 0.4 if was.at < later_end else 0.7
+        assert moved.at == pytest.approx(was.at + expected)
+    assert any(c.at == first_end for c in plan.cues)  # a cue exactly at a take's end moves with it
+    for moved, was in zip(shot.cues, plan.cues):
+        bed = {first.clip: 0.4, later.clip: 0.3}.get(was.scene, 0.0) if was.kind == "ambience" else 0.0
+        assert moved.duration == pytest.approx(was.duration + bed)  # each clip's bed covers its longer take
+    again = scene_takes(shot, "seedance")
+    assert [t.id for t in again] == [t.id for t in takes]
+    for take in again:
+        assert take.duration == pytest.approx(played.get(take.id, next(t for t in takes if t.id == take.id).duration))
+
+
+LATE_TAKE = "4.1"  # planned 14.5 s (3.5 + 5.5 + 5.5), asked for 15 s
+
+
+def _speak_late(monkeypatch, transport, take, last_end):
+    """The take's transcripts say its words, the last one ending at `last_end`."""
+    wait = transport.wait
+
+    def late_wait(endpoint, request_id):
+        payload = wait(endpoint, request_id)
+        if "speech-to-text" in endpoint:
+            audio = str(transport.uploads[str(transport.requests[request_id][1]["audio_url"])])
+            if _take_dir(take.id) in audio:
+                assert payload["text"] == take.line
+                payload = {"text": take.line, "words": _late_words(take, last_end)}
+        return payload
+
+    monkeypatch.setattr(transport, "wait", late_wait)
+
+
+def _late_run(ctx, monkeypatch):
+    plan = load_resolved(ctx)
+    take = next(t for t in scene_takes(plan, "seedance") if t.id == LATE_TAKE)
+    assert (take.duration, request_seconds(take, (4, 15)), bool(take.line)) == (14.5, 15, True)
+    _speak_late(monkeypatch, ctx.gateway.transport, take, 14.74)
+    run_scenes(ctx, "seedance")
+    return plan, take
+
+
+def test_late_line_is_kept_and_the_take_plays_its_whole_clip(staged_ctx, monkeypatch):
+    plan, take = _late_run(staged_ctx, monkeypatch)
+    chosen = read_takes(staged_ctx, "scenes_seedance")[take.id]
+    assert [t.reason for t in chosen.takes] == [None]  # last word at 14.74 s of a 15 s clip: accepted at once
+    clip = ffmpeg.duration(Path(chosen.chosen))
+    assert clip == pytest.approx(15.0, abs=0.05)
+    spans, captions, played = read_timing(staged_ctx, "seedance")
+    assert played[take.id] == round(min(clip, take.duration + MAX_TAIL, MAX_TAKE_SECONDS), 3)
+    takes = scene_takes(plan, "seedance")
+    assert all(played[t.id] == t.duration for t in [opening_take(plan), *takes] if t.id != take.id)
+
+    extra = played[take.id] - take.duration
+    assert extra == pytest.approx(0.5, abs=0.05)
+    shot = as_shot(plan, takes, played)
+    planned = {s.id: s for s in plan.shots}
+    end = take.start_s + take.duration
+    last = next(s for s in shot.shots if s.id == take.shots[-1].id)
+    assert last.duration == pytest.approx(planned[last.id].duration + extra)
+    assert all(s.start_s == pytest.approx(planned[s.id].start_s + (extra if planned[s.id].start_s >= end else 0))
+               for s in shot.shots)
+    assert [c.at for c in shot.cues] == pytest.approx([c.at + (extra if c.at >= end else 0) for c in plan.cues])
+    assert shot.runtime_s == pytest.approx(plan.runtime_s + extra)
+
+    # captions sit on the as-shot timeline: the next take's first page starts `extra` later
+    following = next(t for t in takes if t.start_s >= end and t.line)
+    first_word = following.line.split()[0]
+    page = min((c for c in captions if c.text.startswith(first_word) and c.start >= following.start_s),
+               key=lambda c: c.start)
+    assert page.start == pytest.approx(following.start_s + extra)  # placeholder words start at 0 s in each take
+
+
+def test_a_take_in_tenths_keeps_its_id_when_it_plays_a_full_generation(tmp_path):
+    plan = resolve_plan(load_plan(FILM_PLAN), _episode(tmp_path), load_bible("lincoln"))
+    tenths = {"1.1": 3.1, "1.2": 3.7, "1.3": 3.9, "1.4": 3.6}  # 14.3 s
+    plan = plan.model_copy(update={"shots": [
+        s.model_copy(update={"duration": tenths.get(s.id, s.duration)}) for s in plan.shots]})
+    takes = scene_takes(plan, "seedance")
+    first = takes[0]
+    played = {first.id: played_length(first, 15.08)}
+    assert played[first.id] == MAX_TAKE_SECONDS
+    again = scene_takes(as_shot(plan, takes, played), "seedance")
+    assert [t.id for t in again] == [t.id for t in takes]
+    assert [len(t.shots) for t in again] == [len(t.shots) for t in takes]
+
+
+def test_film_plan_is_one_generation_per_clip(tmp_path):
+    plan = resolve_plan(load_plan(FILM_PLAN), _episode(tmp_path), load_bible("lincoln"))
+    takes = scene_takes(plan, "seedance")
+    assert [t.id for t in takes] == [f"{clip}.1" for clip in range(1, 6)]
+    assert all(3 <= len(t.shots) <= MAX_TAKE_SHOTS and 10 <= t.duration <= MAX_TAKE_SECONDS for t in takes)
+    assert all(3.0 <= s.duration <= 7.0 and s.size != "TWO" and len(s.cast) <= 1 for s in plan.shots)
+    assert any(len({s.place for s in t.shots}) > 1 for t in takes)  # the window-room speech keeps its own setting
+
+
+def test_a_clip_that_needs_two_generations_stops_before_any_call(tmp_path, monkeypatch):
+    ctx = _staged(tmp_path, monkeypatch, plan_file=example_plan_path("lincoln"))
+    before = len(ctx.gateway.ledger.current())
+    with pytest.raises(PlanError, match=r"clip 1 does not fit one generation: 6 shots, 13 s .* re-run the director"):
+        run_scenes(ctx, "seedance")
+    assert len(ctx.gateway.ledger.current()) == before
+
+
+def test_a_frozen_shot_is_named_as_the_reason_a_clip_splits(tmp_path, monkeypatch):
+    ctx = _staged(tmp_path, monkeypatch, plan_file=example_plan_path("lincoln"))
+    plan = load_resolved(ctx)
+    monkeypatch.setattr(scenes_stage, "scene_takes", lambda p, flow: [
+        t for t in scene_takes(p, flow) if t.clip == 5])
+    with pytest.raises(PlanError, match="clip 5 .* slowed or frozen shots are taken alone: 5.3, 5.6"):
+        run_scenes(ctx, "seedance")
+    assert plan.shots[-1].freeze_at is not None
+
+
+@pytest.mark.slow
+def test_late_take_makes_a_longer_master_that_still_validates(staged_ctx, monkeypatch):
+    plan, take = _late_run(staged_ctx, monkeypatch)
+    _, _, played = read_timing(staged_ctx, "seedance")
+    extra = played[take.id] - take.duration
+    assert extra == pytest.approx(0.5, abs=0.05)
+    takes = scene_takes(plan, "seedance")
+    without = as_shot(plan, takes, {**played, take.id: take.duration}).runtime_s
+    total = as_shot(plan, takes, played).runtime_s - plan.runtime_s
+    assert as_shot(plan, takes, played).runtime_s == pytest.approx(without + extra)  # this take adds 0.5 s
+    registry._write_done(staged_ctx, "scenes_seedance")
+    run_stage(staged_ctx, "sound", force=True)
+    run_stage(staged_ctx, "cut_seedance", force=True)  # raises when validate_master finds a problem
+    final = staged_ctx.paths.scope_dir / "cut_seedance" / "final.mp4"
+    assert ffmpeg.duration(final) == pytest.approx(plan.runtime_s + OPENING_SECONDS + total, abs=0.05)
+    low, high = load_series("lincoln").runtime_s
+    assert ffmpeg.validate_master(final, min_s=low, max_s=high + OPENING_SECONDS + total) == []
+    edl = yaml.safe_load((staged_ctx.paths.scope_dir / "cut_seedance" / "edl.yaml").read_text(encoding="utf-8"))
+    assert next(e for e in edl if e["take"] == take.id)["duration"] == pytest.approx(played[take.id])

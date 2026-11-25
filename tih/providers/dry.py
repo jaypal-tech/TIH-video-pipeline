@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +61,7 @@ class DryRunTransport:
         self.uploads: dict[str, Path] = {url: Path(path) for url, path in saved.items()}
         self.spoken: dict[str, str] = {}
         self.lengths: dict[str, float] = {}  # seconds of each scene take's sound, by hash
+        self._lock = threading.Lock()  # stages may call from several threads at once
 
     def submit(self, endpoint: str, arguments: dict[str, Any]) -> str:
         digest = hashlib.sha256(
@@ -127,11 +129,12 @@ class DryRunTransport:
         out = str(destination)
         if kind == "still":
             colour = "0x" + hashlib.sha256(spec["label"].encode()).hexdigest()[:6]
-            label_file = self.workdir / f"{hashlib.sha256(spec['label'].encode()).hexdigest()[:12]}.txt"
+            label_file = destination.with_suffix(".label.txt")  # one per download, never shared
             label_file.write_text(spec["label"], encoding="utf-8")
             _ffmpeg(["-f", "lavfi", "-i", f"color=c={colour}:s=720x1280", "-frames:v", "1",
                      "-vf", f"drawtext=textfile={label_file}:fontcolor=white:fontsize=28:x=20:y=60",
                      "-f", "image2", "-c:v", "png", out])
+            label_file.unlink()
         elif kind == "hold":
             _ffmpeg(["-loop", "1", "-i", spec["source"], "-t", f"{spec['seconds']}", "-r", "24",
                      "-vf", "format=yuv420p", "-c:v", "libx264", "-preset", "ultrafast",
@@ -161,8 +164,9 @@ class DryRunTransport:
 
     def upload(self, path: Path) -> str:
         url = f"https://dry.run/upload/{_sha(Path(path))}"
-        self.uploads[url] = Path(path)
-        self.uploads_file.write_text(
-            json.dumps({key: str(value) for key, value in self.uploads.items()}, indent=2)
-        )
+        with self._lock:
+            self.uploads[url] = Path(path)
+            self.uploads_file.write_text(
+                json.dumps({key: str(value) for key, value in self.uploads.items()}, indent=2)
+            )
         return url

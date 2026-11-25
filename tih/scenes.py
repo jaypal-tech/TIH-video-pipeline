@@ -35,7 +35,7 @@ class SceneTake(BaseModel):
 
 class Caption(BaseModel):
     text: str
-    start: float  # seconds from the start of the episode's shots (before the opening shift)
+    start: float  # seconds from the start of the as-shot episode's shots (before the opening shift)
     end: float
 
 
@@ -63,11 +63,10 @@ def scene_takes(plan: ResolvedPlan, flow: Flow) -> list[SceneTake]:
             flow == "seedance"
             and current is not None
             and current[0].clip == shot.clip
-            and current[0].place == shot.place
             and not _alone(shot)
             and not _alone(current[-1])
             and len(current) < MAX_TAKE_SHOTS
-            and sum(s.duration for s in current) + shot.duration <= MAX_TAKE_SECONDS
+            and sum(s.duration for s in current) + shot.duration <= MAX_TAKE_SECONDS + 1e-6  # float sums
         )
         if fits:
             current.append(shot)
@@ -183,4 +182,38 @@ def shifted(plan: ResolvedPlan, seconds: float) -> ResolvedPlan:
         "runtime_s": plan.runtime_s + seconds,
         "shots": [s.model_copy(update={"start_s": s.start_s + seconds}) for s in plan.shots],
         "cues": [c.model_copy(update={"at": c.at + seconds}) for c in plan.cues],
+    })
+
+
+def as_shot(plan: ResolvedPlan, takes: list[SceneTake], played: dict[str, float]) -> ResolvedPlan:
+    """The plan as the takes were shot: a take that plays longer than planned lengthens its last shot.
+
+    Every later shot, and every cue at or after that take's planned end, moves by
+    the extra; the clip's ambience bed grows by it; the runtime grows by the total.
+    A take with no extra is unchanged.
+    """
+    extra_after: dict[str, float] = {}  # a take's last shot id -> its extra seconds
+    ends: list[tuple[float, float]] = []  # (planned end, extra) per lengthened take
+    grown: dict[int, float] = {}  # clip -> its takes' extra, so the clip's ambience bed covers it
+    for take in takes:
+        extra = played.get(take.id, take.duration) - take.duration
+        if extra > 0 and take.shots:
+            extra_after[take.shots[-1].id] = extra
+            ends.append((take.start_s + take.duration, extra))
+            grown[take.clip] = grown.get(take.clip, 0.0) + extra
+    if not ends:
+        return plan
+    shots, moved = [], 0.0
+    for shot in plan.shots:
+        update = {"start_s": shot.start_s + moved}
+        if shot.id in extra_after:
+            update["duration"] = shot.duration + extra_after[shot.id]
+            moved += extra_after[shot.id]
+        shots.append(shot.model_copy(update=update))
+    cues = [c.model_copy(update={
+        "at": c.at + sum(extra for end, extra in ends if c.at >= end - 1e-9),
+        "duration": c.duration + (grown.get(c.scene, 0.0) if c.kind == "ambience" else 0.0),
+    }) for c in plan.cues]
+    return plan.model_copy(update={
+        "shots": shots, "cues": cues, "runtime_s": plan.runtime_s + sum(extra for _, extra in ends),
     })

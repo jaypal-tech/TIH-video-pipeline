@@ -47,7 +47,7 @@ characters:
     name_card: "JOHN WILKES BOOTH · America's matinee idol · 26"
     episodes: [1, 2, 3, 4, 5]
     screen_name: "THE ACTOR"
-    scene_look: "a 26-year-old man of compact build, jet-black curly hair to the collar, long sideburns, a thick black handlebar moustache with upturned ends, dark eyes under heavy brows, pale handsome face, a black flat-crowned wide-brimmed felt hat, a white high stand collar with a black silk cravat, a knee-length charcoal wool frock coat with a black velvet collar and four black cloth-covered buttons, black leather gloves"
+    scene_look: "a 26-year-old man, jet-black curly hair to the collar, long sideburns, a thick black handlebar moustache with upturned ends, dark eyes under heavy brows, pale handsome face, a black flat-crowned wide-brimmed hat, a white high collar with a black silk cravat, a dark wool frock coat with a dark velvet collar, dark leather gloves"
     scene_voice: "a smooth, controlled, educated American baritone, almost a whisper"
     look: >-
       26-year-old man, 5'8" athletic build, pale skin, dark intense eyes,
@@ -63,7 +63,7 @@ characters:
     name_card: "LEWIS POWELL · Confederate veteran · 20"
     episodes: [1, 5]
     screen_name: "THE SOLDIER"
-    scene_look: "a 20-year-old man, very tall and broad-shouldered, a clean-shaven ruddy boyish face with a square jaw, short brown hair, a flat unblinking stare, a grey wool forage cap with a short black leather visor, a hip-length dark grey wool sack coat with five plain brass buttons, buttoned to the neck over a collarless grey shirt"
+    scene_look: "a 20-year-old man, very tall and broad-shouldered, a clean-shaven ruddy boyish face with a square jaw, short brown hair, a flat unblinking stare, a grey wool forage cap with a short black leather visor, a plain dark wool sack coat buttoned over a collarless grey shirt"
     scene_voice: "a slow, deep, flat Southern drawl, barely above a murmur"
     look: >-
       20-year-old man, 6'2", very broad heavy shoulders, heavy square jaw,
@@ -76,7 +76,7 @@ characters:
     episodes: [1, 2]
     face_reference: false
     screen_name: "THE PRESIDENT"
-    scene_look: "a 56-year-old man, very tall and gaunt, a deeply lined hollow-cheeked face, a dark chin beard with no moustache, dark tousled hair, no hat, a knee-length black wool frock coat worn open, a black waistcoat, a white shirt with a turned-down collar and a black bow tie"
+    scene_look: "a 56-year-old man, very tall and gaunt, a deeply lined hollow-cheeked face, a dark chin beard with no moustache, dark tousled hair, a black frock coat, a white shirt and a black bow tie"
     scene_voice: "a high, clear, reedy tenor with a Kentucky accent, slow and deliberate, pitched to carry over a silent crowd"
     look: >-
       man aged 56, 6'4", very tall and gaunt, deeply lined hollow-cheeked face,
@@ -92,7 +92,7 @@ characters:
     episodes: [1]
     face_reference: false
     screen_name: "THE BOY"
-    scene_look: "a 12-year-old boy with dark tousled hair, no hat, a small dark brown wool jacket with three buttons, a white shirt collar and dark knee trousers"
+    scene_look: "a 12-year-old boy with dark hair, a small dark wool jacket and a white collar"
     look: 12-year-old boy, small for his age, tousled hair, dark boy's jacket
     voice: null # silent
   grant:
@@ -202,7 +202,7 @@ places:
       the same White House north lawn seen from the mansion side, the camera
       facing a dense night crowd with torches and umbrellas, torch-amber light
       on faces, moon-blue rain, no building in frame
-    scene_look: "inside a dense crowd on an open lawn at night in April 1865, steady drizzle. The camera has its back to the house, so no building is in frame: only men in dark felt hats and dark wool coats on every side, black umbrellas, hand-held burning pine torches, wet mud underfoot, bare trees and black sky far behind. Amber torchlight falls on the left side of faces; the right side falls into cold blue-black night. The men face the camera and look up past it at a lit window high above and behind the camera."
+    scene_look: "inside a dense crowd on an open lawn at night in April 1865, steady drizzle. Men in dark felt hats and dark wool coats press in on every side, black umbrellas overhead, hand-held burning pine torches, wet mud underfoot; behind them only more hats and umbrellas fading into black night and rain. Amber torchlight falls on the left side of faces; the right side falls into cold blue-black night. Everyone faces the camera and looks up past it at something high above and behind the camera."
   L2:
     name: The window above the north portico
     look: >-

@@ -35,6 +35,7 @@ from tih.stages import registry
 from tih.stages import cut
 from tih.stages.cut import played_seconds, without_title_super
 from tih.stages.registry import RunContext, run_stage
+from tih.stages.scenes import read_timing
 from tih.stages.voice import line_pieces, slice_for_shot, speech_text, word_difference
 from tih.story.models import Episode
 
@@ -55,13 +56,16 @@ def episode_one(tmp_path):
     return Episode.model_validate(yaml.safe_load(script.read_text(encoding="utf-8")))
 
 
-def _staged(ctx):
-    """Stand in for the Writer and the Director: the draft script and the example plan."""
+FILM_PLAN = ROOT / "tests" / "fixtures" / "film_plan.yaml"  # one generation per clip: what scenes_seedance takes
+
+
+def _staged(ctx, plan_file=None):
+    """Stand in for the Writer and the Director: the draft script and the example plan (or `plan_file`)."""
     scope = ctx.paths.scope_dir
     (scope / "writers_room").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(scope / "record" / "script.yaml", scope / "writers_room" / "script.yaml")
     plan_path(ctx.paths).parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(example_plan_path("lincoln"), plan_path(ctx.paths))
+    shutil.copyfile(plan_file or example_plan_path("lincoln"), plan_path(ctx.paths))
     registry._write_done(ctx, "writers_room")
     registry._write_done(ctx, "director")
 
@@ -273,7 +277,7 @@ def test_rehearsal_needs_director(tmp_path):
 def _rehearsed(tmp_path, flow):
     source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
     run_stage(source, "record")
-    _staged(source)
+    _staged(source, FILM_PLAN)
     return rehearse_episode(1, "lincoln", tmp_path / "dry", source=tmp_path / "src", flow=flow)
 
 
@@ -316,7 +320,9 @@ def test_rehearsal_cut_opens_with_the_title_and_one_part_per_take(tmp_path, flow
     assert [row["take"] for row in edl] == ["0", *(t.id for t in scene_takes(plan, flow))]
     assert edl[0]["record_in"] == 0.0 and edl[1]["record_in"] == OPENING_SECONDS
     final = ctx.paths.stage_dir(f"cut_{flow}") / "final.mp4"
-    assert ffmpeg.duration(final) == pytest.approx(plan.runtime_s + OPENING_SECONDS, abs=0.2)
+    played = read_timing(ctx, flow)[2]
+    extra = sum(played[t.id] - t.duration for t in scene_takes(plan, flow))  # takes play as generated
+    assert ffmpeg.duration(final) == pytest.approx(plan.runtime_s + OPENING_SECONDS + extra, abs=0.2)
 
 
 def test_episode_command_needs_a_known_flow():
@@ -444,22 +450,25 @@ def test_sound_needs_look_lock(tmp_path, monkeypatch):
 def test_second_rehearsal_uses_new_plan(tmp_path):
     source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
     run_stage(source, "record")
-    _staged(source)
+    _staged(source, FILM_PLAN)
     root = tmp_path / "dry"
     first = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
     takes = scene_takes(load_resolved(first), "seedance")
     plan = plan_path(source.paths)
     data = yaml.safe_load(plan.read_text(encoding="utf-8"))
-    # move half a second from shot 1.5 (the second take's first) to shot 1.4 (the first take's last);
-    # the clip (and its ambience bed) keeps its length
-    assert (takes[0].shots[-1].id, takes[1].shots[0].id) == (data["shots"][3]["id"], data["shots"][4]["id"])
-    data["shots"][3]["duration"] += 0.5
-    data["shots"][4]["duration"] -= 0.5
+    # move half a second from shot 1.4 to shot 1.3 inside the first take; the clip keeps its length
+    assert [s["id"] for s in data["shots"][2:4]] == [s.id for s in takes[0].shots[2:4]]
+    data["shots"][2]["duration"] += 0.5
+    data["shots"][3]["duration"] -= 0.5
     plan.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
+    again = {s.id: s for s in load_resolved(ctx).shots}
+    assert (again["1.3"].duration, again["1.4"].start_s) == (data["shots"][2]["duration"], takes[0].shots[3].start_s + 0.5)
+    scene_calls = [r for r in Ledger(root / "lincoln" / "calls.jsonl").current()
+                   if r.step == "scene" and r.shot == "seedance-take1.1"]
+    assert len(scene_calls) == 2  # the changed take is generated anew; the others are reused
     edl = yaml.safe_load((ctx.paths.scope_dir / "cut_seedance" / "edl.yaml").read_text(encoding="utf-8"))
-    assert edl[1]["duration"] == takes[0].duration + 0.5
-    assert edl[2]["record_in"] == OPENING_SECONDS + takes[0].duration + 0.5
+    assert edl[2]["record_in"] == OPENING_SECONDS + takes[0].duration
 
 
 def test_slice_for_shot_boundaries():
@@ -623,3 +632,9 @@ def test_take_sound_fades_only_briefly_at_its_edges(monkeypatch, tmp_path):
     cut._mix_inputs([(tmp_path / "take.wav", 5.0, 9.5, 0.0)], 20.0, tmp_path / "d.wav", fade=cut.TAKE_FADE)
     graph = seen[0][seen[0].index("-filter_complex") + 1]
     assert "afade=t=in:d=0.050" in graph and "afade=t=out:st=9.450:d=0.050" in graph
+
+
+def test_opening_under_the_title_is_only_lightly_dimmed():
+    look = dict(part.split("=", 1) for part in cut.OPENING_LOOK.removeprefix("eq=").split(":"))
+    assert "blur" not in cut.OPENING_LOOK
+    assert -0.1 <= float(look["brightness"]) < 0 and float(look["saturation"]) >= 0.8

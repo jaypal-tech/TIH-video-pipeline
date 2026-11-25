@@ -255,10 +255,11 @@ def test_seedance_prompt_follows_the_first_film(plan, bible):
     take = next(t for t in scene_takes(plan, "seedance") if len(t.shots) > 1 and "booth" in t.shots[0].cast)
     prompt = scene_brief(take, bible, plate=True)["prompt_seedance"]
     assert bible.style.scene_look in prompt.split("\n\n")[0]
-    assert "\n\nSetting for every shot: " in prompt
+    assert {s.place for s in take.shots} == {take.place}
+    assert prompt.split("\n\n")[1] == "Setting: " + bible.places[take.place].scene_look
+    assert "Setting for every shot" not in prompt
     assert "THE ACTOR - " + bible.characters["booth"].scene_look in prompt
     assert bible.characters["booth"].look not in prompt
-    assert "Setting for every shot: " + bible.places[take.place].scene_look in prompt
     assert "eference" not in prompt
     assert prompt.rstrip().endswith("No music score.")
 
@@ -411,3 +412,16 @@ def test_multi_shot_audio_omits_silent_shots_and_single_shot_keeps_form(plan, bi
     single = next(t for t in scene_takes(plan, "seedance") if len(t.shots) == 1).model_copy(deep=True)
     single.shots[0].sound = "rain, wind"
     assert _seedance_audio(scene_brief(single, bible, plate=True)["prompt_seedance"]) == "Audio: rain, wind. No music score."
+
+
+def test_a_take_that_changes_place_sets_each_shot(plan, bible):
+    take = next(t for t in scene_takes(plan, "seedance") if len({s.place for s in t.shots}) > 1)
+    paragraphs = scene_brief(take, bible, plate=False)["prompt_seedance"].split("\n\n")
+    assert not any(p.startswith("Setting") for p in paragraphs)
+    shots = [p for p in paragraphs if SHOT_HEADER.match(p)]
+    assert len(shots) == len(take.shots)
+    for paragraph, shot in zip(shots, take.shots):
+        header, rest = paragraph.split("): ", 1)
+        assert rest.startswith("Setting: " + bible.places[shot.place].scene_look + " ")
+        others = {p for p in {s.place for s in take.shots} if p != shot.place}
+        assert not any(bible.places[p].scene_look in paragraph for p in others)

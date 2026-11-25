@@ -47,6 +47,7 @@ class StepConfig(BaseModel):
     fallbacks: list[FallbackConfig] = Field(default_factory=list)
     duration_range: tuple[int, int] | None = None
     pause_token: str | None = None
+    parallel: int = Field(default=1, ge=1)  # how many shots or takes a stage may run at once
 
 
 class PipelineConfig(BaseModel):
