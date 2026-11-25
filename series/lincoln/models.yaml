@@ -37,6 +37,9 @@ endpoints:
     rate: 8.0
 
   # Voice
+  elevenlabs-api/text-to-speech: # ElevenLabs directly; approximate, the account's plan sets the real price
+    unit: 1000 characters
+    rate: 0.30
   fal-ai/minimax/voice-design:
     unit: cloned voices
     rate: 3.015 # $3 per voice plus the longest allowed 500-character preview

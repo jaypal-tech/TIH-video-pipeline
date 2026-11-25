@@ -1,0 +1,27 @@
+characters:
+  booth:
+    reference: series/lincoln/assets/characters/booth/identity.png
+    reference_sha256: 358affc5c40b8b6b8500502686f957c0c6bf4820e2a7780262917b1c346df25e
+    seed: 1866
+    voice_id: nPczCjzI2devNBz1zQrb
+  lincoln:
+    reference: series/lincoln/assets/characters/lincoln/identity.png
+    reference_sha256: d2257674c14457be7d65eee83268e59e11c38849e6a4bde22c308f2b57a3ee7f
+    seed: 1866
+    voice_id: iP95p4xoKVk53GoZ742B
+  powell:
+    reference: series/lincoln/assets/characters/powell/identity.png
+    reference_sha256: 0ac691f755c0a29f01ccc15c61efdba6d5ec0e2d0924e85df40a31aa237f67da
+    seed: 1866
+    voice_id: SOYHLrjzK2X1ezoPC6cr
+  tad:
+    reference: series/lincoln/assets/characters/tad/identity.png
+    reference_sha256: 34fa69835842c8cd731874cc55b3dadc57d25073126acb38facd1ccbe8967d75
+    seed: 1867
+places:
+  L1:
+    reference: series/lincoln/assets/places/L1/plate.png
+    reference_sha256: 42c24f24b9743bb716139c993748ec25918db5d2ae14c19cad730a66e4ddf570
+  L2:
+    reference: series/lincoln/assets/places/L2/plate.png
+    reference_sha256: 5b1d2005085aa8b0e0ab66f8506e3ef288adfd3ea708b6056e2ad776351506e8

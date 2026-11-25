@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from tih.assets import ShotRef
 from tih.bible import load_bible
 from tih.ledger import Ledger
+from tih.providers.elevenlabs import ElevenLabsTransport, RoutedTransport
 from tih.providers.fal import GatewayContext, GenerationResult, generate
 from tih.series import load_series
 from tih.shots import PlanError, ResolvedPlan, load_plan, plan_path, resolve_plan
@@ -104,7 +105,9 @@ def render_arguments(template: Any, values: dict[str, Any]) -> Any:
 def gateway_for(ctx: RunContext) -> GatewayContext:
     if ctx.gateway is not None:
         return ctx.gateway
-    return GatewayContext.for_run(ctx.paths)
+    gateway = GatewayContext.for_run(ctx.paths)
+    gateway.transport = RoutedTransport(gateway.transport, ElevenLabsTransport())
+    return gateway
 
 
 def load_resolved(ctx: RunContext) -> ResolvedPlan:

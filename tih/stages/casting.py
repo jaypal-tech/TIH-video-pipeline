@@ -8,7 +8,7 @@ what every later shot uses.
 
 from tih.assets import ShotRef
 from tih.bible import character_text, load_bible, load_locks
-from tih.briefs import voice_design_brief
+from tih.briefs import voice_design_brief, voice_preview
 from tih.gates import require_approved
 from tih.production import (
     TakeSet,
@@ -44,10 +44,10 @@ def run_casting(ctx: RunContext) -> None:
 
     on_screen = sorted({c for shot in plan.shots for c in shot.cast})
     speakers = sorted({shot.speaker for shot in plan.shots if shot.speaker})
-    first_line = {}
+    lines: dict[str, list[str]] = {}
     for shot in plan.shots:
-        if shot.speaker and shot.speaker not in first_line:
-            first_line[shot.speaker] = shot.line
+        if shot.speaker:
+            lines.setdefault(shot.speaker, []).append(shot.line)
 
     sets: dict[str, TakeSet] = {}
     for character_id in on_screen:
@@ -86,7 +86,8 @@ def run_casting(ctx: RunContext) -> None:
                 "voice_design",
                 {
                     "voice_description": voice_design_brief(bible.characters[character_id]),
-                    "preview_text": first_line[character_id],
+                    "preview_text": voice_preview(lines[character_id]),
+                    "voice_name": f"{series} {character_id} take {take + 1}",
                 },
                 ShotRef(episode=None, shot=character_id, step="voice_design"),
                 take=take,

@@ -19,7 +19,7 @@ from tih.gates import ArtifactChanged, GateNotApproved, approve, require_approve
 from tih.ledger import Ledger
 from tih.media.ffmpeg import duration, validate_master
 from tih.paths import RunPaths
-from tih.production import load_resolved, read_takes, render_arguments
+from tih.production import load_pipeline, load_resolved, read_takes, render_arguments
 from tih.providers.dry import DryRunTransport
 from tih.providers.fal import GatewayContext, generate
 from tih.assets import ShotRef
@@ -461,3 +461,11 @@ def test_every_pipeline_step_is_used_by_a_stage():
     code = "".join(p.read_text(encoding="utf-8") for p in (ROOT / "tih").rglob("*.py"))
     unused = [name for name in pipeline["steps"] if f'"{name}"' not in code]
     assert unused == []
+
+
+def test_voices_are_designed_and_spoken_on_elevenlabs_directly():
+    # fal's text filter refused "You could hit him from here." on every fal speech model (2026-11-25)
+    steps = load_pipeline("lincoln").steps
+    assert steps["voice_design"].endpoint == "elevenlabs-api/voice-design"
+    assert steps["speech"].endpoint == "elevenlabs-api/text-to-speech"
+    assert steps["transcribe"].endpoint.startswith("fal-ai/")

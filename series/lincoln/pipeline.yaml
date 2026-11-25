@@ -26,13 +26,15 @@ steps:
       seed: "{seed}"
       num_images: 1
 
-  voice_design:
-    endpoint: fal-ai/minimax/voice-design
-    estimate_usd: 3.02
+  voice_design: # ElevenLabs directly: fal's text filter refuses the real script on every fal speech model
+    endpoint: elevenlabs-api/voice-design
+    estimate_usd: 0.10
     takes: 2
     arguments:
-      prompt: "{voice_description}"
-      preview_text: "{preview_text}"
+      voice_description: "{voice_description}"
+      text: "{preview_text}"
+      model_id: eleven_ttv_v3
+      voice_name: "{voice_name}"
 
   plate: # one empty view of each place, locked and attached to every keyframe there
     endpoint: google/nano-banana-2.1
@@ -83,19 +85,17 @@ steps:
           resolution: 1080P
           prompt_expansion_mode: disabled # otherwise it rewrites the prompt
 
-  speech:
-    endpoint: fal-ai/minimax/speech-2.8-hd
-    estimate_usd: 0.02
+  speech: # ElevenLabs directly, with the voice designed above; v3 reads … as a pause itself
+    endpoint: elevenlabs-api/text-to-speech
+    estimate_usd: 0.03
     takes: 2 # a second take only if the first fails the word check
-    pause_token: "<#0.6#>" # replaces … so the ellipsis is a pause, never a word
     arguments:
-      prompt: "{text}"
-      voice_setting:
-        voice_id: "{voice_id}"
+      text: "{text}"
+      voice_id: "{voice_id}"
+      model_id: eleven_v3
+      voice_settings:
         speed: "{speed}" # from the line's direction (tih.briefs); left out when none
-        emotion: "{emotion}"
-      language_boost: English
-      output_format: url
+      output_format: mp3_44100_128
 
   transcribe:
     endpoint: fal-ai/elevenlabs/speech-to-text/scribe-v2

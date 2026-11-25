@@ -156,6 +156,22 @@ def voice_design_brief(character: Character) -> str:
     return f"{voice}. {role(character)}. Clean close-mic studio recording, no music, no reverb."
 
 
+VOICE_PREVIEW_LIMIT = 500  # MiniMax voice design's preview_text maximum
+
+
+def voice_preview(lines: list[str], limit: int = VOICE_PREVIEW_LIMIT) -> str:
+    """The character's own lines, whole and in order, up to the limit: longer samples design steadier voices."""
+    preview = ""
+    for line in lines:
+        joined = f"{preview} {line.strip()}".strip()
+        if len(joined) > limit:
+            break
+        preview = joined
+    if not preview and lines:
+        preview = lines[0].strip()[:limit].rsplit(" ", 1)[0] if len(lines[0].strip()) > limit else lines[0].strip()
+    return preview
+
+
 def cue_brief(cue: Cue, bible: Bible) -> str:
     parts = [cue.prompt.strip().rstrip(".")]
     if bible.style.sound_period:

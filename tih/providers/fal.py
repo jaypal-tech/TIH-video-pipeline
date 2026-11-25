@@ -26,6 +26,7 @@ REFUSAL_TEXT = re.compile(
     r"content.?policy|safety|sensitive|nsfw|moderation|prohibited|violat", re.I
 )
 POLL_SECONDS = 3.0
+ELEVENLABS_PREFIX = "elevenlabs-api/"  # steps sent to ElevenLabs directly, not through fal
 MAX_WAIT_SECONDS = 1800.0
 
 
@@ -63,6 +64,10 @@ def _translate(error: fal_client.FalClientHTTPError, at_submit: bool) -> Excepti
     if is_refusal(error.status_code, error.error_type, message):
         return ProviderRefused(message, at_submit=at_submit)
     return ProviderError(message, status_code=error.status_code)
+
+
+def provider_name(endpoint: str) -> str:
+    return "elevenlabs" if endpoint.startswith(ELEVENLABS_PREFIX) else "fal"
 
 
 def fal_key() -> str:
@@ -275,7 +280,7 @@ def _attempt(
                     clip=shot_ref.clip,
                     shot=shot_ref.shot,
                     step=step,
-                    provider="fal",
+                    provider=provider_name(endpoint),
                     model=endpoint,
                     settings=settings,
                     prompt=prompt,

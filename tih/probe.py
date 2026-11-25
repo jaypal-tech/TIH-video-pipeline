@@ -101,6 +101,7 @@ def run_probe(ctx: RunContext, shot_id: str) -> list[ProbeResult]:
     attempt("voice_design", "voice_design", steps["voice_design"], {
         "voice_description": voice_design_brief(bible.characters[character]),
         "preview_text": shot.line,
+        "voice_name": f"{series} {character} probe",
     })
     attempt("speech", "voice", steps["speech"], lambda: {
         "text": speech_text(shot.line, steps["speech"].pause_token),

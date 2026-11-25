@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from tih.bible import load_bible
-from tih.briefs import cue_brief, keyframe_brief, motion_brief, speech_settings, voice_design_brief
+from tih.briefs import cue_brief, keyframe_brief, motion_brief, speech_settings, voice_design_brief, voice_preview
 from tih.paths import RunPaths
 from tih.shots import Cue, example_plan_path, load_plan, resolve_plan
 from tih.stages import record  # noqa: F401  registers the record stage
@@ -114,3 +114,17 @@ def test_keyframe_brief_names_each_person_s_must_haves(plan, bible):
 def test_keyframe_brief_without_cast_has_no_must_haves(plan, bible):
     prompt = keyframe_brief(shot(plan, "1.2"), bible)["prompt_gemini"]
     assert "Keep for" not in prompt
+
+
+def test_voice_preview_joins_whole_lines_up_to_the_limit():
+    lines = ["You could hit him from here.", "Then just listen.", "Go on. I'm listening.", "x" * 600]
+    assert voice_preview(lines, limit=60) == "You could hit him from here. Then just listen."
+    assert voice_preview(lines) == "You could hit him from here. Then just listen. Go on. I'm listening."
+    assert voice_preview(["one two three four"], limit=12) == "one two"
+    assert len(voice_preview(["word " * 200])) <= 500
+
+
+def test_voice_preview_uses_the_speaker_s_lines_in_order(plan):
+    lines = [s.line for s in plan.shots if s.speaker == "booth"]
+    preview = voice_preview(lines)
+    assert preview.startswith(lines[0]) and lines[1] in preview and len(preview) > len(lines[0])
