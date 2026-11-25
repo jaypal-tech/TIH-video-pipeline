@@ -106,6 +106,25 @@ def extract_audio(source: Path, target: Path) -> Path:
     return target
 
 
+# Scene scores of the first film's seven takes (2026-11-25): its 14 real cuts scored 0.18-0.49,
+# the strongest movement inside a shot 0.15. A miss or an extra only makes a take keep its plan.
+SCENE_CUT = 0.17
+
+
+def retime_audio(source: Path, target: Path, tempo: float) -> Path:
+    """The same audio played `tempo` times as fast, at the same pitch."""
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(source), "-vn", "-af", f"atempo={tempo:.3f}",
+         "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", str(target)])
+    return target
+
+
+def cut_times(video: Path) -> list[float]:
+    """Seconds into a clip at which its picture hard-cuts to a new shot."""
+    report = run(["ffmpeg", "-hide_banner", "-i", str(video), "-an",
+                  "-vf", f"select='gt(scene,{SCENE_CUT})',showinfo", "-f", "null", "-"])
+    return [float(seconds) for seconds in re.findall(r"pts_time:([\d.]+)", report)]
+
+
 def concat(parts: list[Path], target: Path) -> None:
     listing = target.with_suffix(".txt")
     listing.write_text(

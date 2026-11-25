@@ -886,14 +886,17 @@ def test_a_clip_that_needs_two_generations_stops_before_any_call(tmp_path, monke
     assert len(ctx.gateway.ledger.current()) == before
 
 
-def test_a_frozen_shot_is_named_as_the_reason_a_clip_splits(tmp_path, monkeypatch):
+def test_a_frozen_shot_is_its_own_take_and_does_not_stop_the_run(tmp_path, monkeypatch):
     ctx = _staged(tmp_path, monkeypatch, plan_file=example_plan_path("lincoln"))
-    plan = load_resolved(ctx)
-    monkeypatch.setattr(scenes_stage, "scene_takes", lambda p, flow: [
-        t for t in scene_takes(p, flow) if t.clip == 5])
-    with pytest.raises(PlanError, match="clip 5 .* slowed or frozen shots are taken alone: 5.3, 5.6"):
-        run_scenes(ctx, "seedance")
-    assert plan.shots[-1].freeze_at is not None
+    takes = [t for t in scene_takes(load_resolved(ctx), "seedance") if t.clip == 5]
+    frozen = [t for t in takes if scenes_stage._alone(t)]
+    assert frozen and all(len(t.shots) == 1 for t in frozen)
+    rest = [t for t in takes if not scenes_stage._alone(t)]
+    if all(t.duration >= scenes_stage.MIN_SPLIT_SECONDS for t in rest):
+        scenes_stage._one_take_per_clip(takes)  # only the frozen shots are short: allowed
+    else:
+        with pytest.raises(PlanError, match="clip 5 does not fit one generation"):
+            scenes_stage._one_take_per_clip(takes)
 
 
 @pytest.mark.slow
@@ -907,6 +910,7 @@ def test_late_take_makes_a_longer_master_that_still_validates(staged_ctx, monkey
     total = as_shot(plan, takes, played).runtime_s - plan.runtime_s
     assert as_shot(plan, takes, played).runtime_s == pytest.approx(without + extra)  # this take adds 0.5 s
     registry._write_done(staged_ctx, "scenes_seedance")
+    run_stage(staged_ctx, "narration", force=True)
     run_stage(staged_ctx, "sound", force=True)
     run_stage(staged_ctx, "cut_seedance", force=True)  # raises when validate_master finds a problem
     final = staged_ctx.paths.scope_dir / "cut_seedance" / "final.mp4"

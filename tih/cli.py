@@ -6,6 +6,7 @@ import typer
 
 from tih.bible import (
     LOCKS_OVERRIDE,
+    NARRATOR_ID,
     CharacterLock,
     PlaceLock,
     file_sha256,
@@ -29,6 +30,7 @@ from tih.stages import cut as _cut  # noqa: F401  registers the stage
 from tih.stages import director as _director  # noqa: F401  registers the stage
 from tih.stages import historians_desk as _historians_desk  # noqa: F401  registers the stage
 from tih.stages import lipsync as _lipsync  # noqa: F401  registers the stage
+from tih.stages import narration as _narration  # noqa: F401  registers the stage
 from tih.stages import performance as _performance  # noqa: F401  registers the stage
 from tih.stages import plates as _plates  # noqa: F401  registers the stage
 from tih.stages import record as _record  # noqa: F401  registers the stage
@@ -42,7 +44,7 @@ from tih.stages.registry import DONE_FILE, RunContext, run_stage
 
 # The order an episode runs in after Script Lock and Look Lock, per flow. Only Seedance is built.
 FLOW_STAGES: dict[str, tuple[str, ...]] = {
-    flow: ("director", "shotplan", f"scenes_{flow}", "sound", f"cut_{flow}") for flow in ("seedance",)
+    flow: ("director", "shotplan", "narration", f"scenes_{flow}", "sound", f"cut_{flow}") for flow in ("seedance",)
 }
 
 app = typer.Typer(no_args_is_help=True)
@@ -270,9 +272,11 @@ def lock_voice(
     endpoint: str | None = typer.Option(None, "--endpoint"),
     series: str = typer.Option(..., "--series"),
 ) -> None:
-    """Lock a character's voice id for every future line."""
+    """Lock a character's voice id for every future line; `narrator` locks the narrator's."""
     bible = load_bible(series)
-    if character not in bible.characters or not bible.characters[character].voice:
+    speaks = bible.narrator is not None if character == NARRATOR_ID else (
+        character in bible.characters and bible.characters[character].voice)
+    if not speaks:
         raise typer.BadParameter(f"{character} is not a speaking character in the bible")
     locks = load_locks(series)
     lock = locks.characters.get(character, CharacterLock())

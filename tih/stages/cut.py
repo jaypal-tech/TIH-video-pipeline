@@ -7,11 +7,16 @@
    joined in order.
 2. Dialogue: each take's own sound starts with its take, is mixed into one
    stem and normalised to -16 LUFS in two passes.
-3. Music and effects: each cue at its time and level, ducked under speech.
-4. Text: the title block over the opening; caption pages timed to the words
-   the model spoke; tags, name cards, supers and the TRUE card drawn over the
-   clean picture; the white flash at the end.
-5. Check: validate_master must return no problems, or the stage fails.
+3. Narration: each line starts NARRATION_LEAD after its first shot does (the
+   opening's line OPENING_NARRATION_LEAD into the film), on its own stem at
+   the dialogue's loudness; the takes' sound drops NARRATION_DUCK_DB under it.
+   A take plays more of its clip rather than cut a line off.
+4. Music and effects: each cue at its time and level, ducked under speech
+   and narration.
+5. Text: the title block over the opening; caption pages timed to the words
+   the model and the narrator spoke; tags, name cards, supers and the TRUE
+   card drawn over the clean picture; the white flash at the end.
+6. Check: validate_master must return no problems, or the stage fails.
 """
 
 import json
@@ -26,19 +31,23 @@ from tih.media.overlays import Text, drawtext_filters, opening_title
 from tih.media.overlays import filters as overlay_filters
 from tih.production import load_resolved, read_takes
 from tih.scenes import (
-    OPENING_ID, OPENING_SECONDS, Caption, Flow, SceneTake, as_shot, opening_take, retimed, scene_takes, shifted,
+    MAX_TAKE_SECONDS, OPENING_ID, OPENING_SECONDS, Caption, Flow, SceneTake, as_shot, moved_captions, narration_extras,
+    narration_pages, narration_starts, opening_take, retimed, scene_takes, shifted, without_overlap,
 )
 from tih.series import load_series
 from tih.shots import ResolvedPlan
+from tih.stages.narration import read_narration
 from tih.stages.performance import source_seconds
 from tih.stages.registry import RunContext, Stage, register
-from tih.stages.scenes import read_timing
+from tih.stages.scenes import read_shots, read_timing
 from tih.story.models import Episode
 
 SAMPLE_RATE = 48000
 FLASH_SECONDS = 0.5
 OPENING_LOOK = "eq=brightness=-0.06:saturation=0.9"  # lightly dimmed under the title, still clearly visible
 TAKE_FADE = 0.05  # seconds faded in and out at each take's edges; a take's last word may end 0.1 s before its end
+NARRATION_DUCK_DB = -12.0  # the takes' own sound while the narrator speaks
+NARRATION_RAMP = 0.15  # seconds the takes' sound takes to drop under the narrator and to come back
 
 
 def record_in(take: SceneTake) -> float:
@@ -170,8 +179,38 @@ def _mix_inputs(
     ffmpeg.run(args)
 
 
-def _sound(ctx: RunContext, plan: ResolvedPlan, flow: Flow, work: Path) -> tuple[Path, ffmpeg.Loudness | None]:
-    """`plan` is the episode's own plan; the mix runs on it shifted past the opening."""
+def duck_under(windows: list[tuple[float, float]]) -> str:
+    """A volume filter that holds the sound at NARRATION_DUCK_DB inside each (start, end) window, with ramps."""
+    ramp = NARRATION_RAMP
+    inside = "+".join(
+        f"clip((t-{start - ramp:.3f})/{ramp},0,1)*clip(({end + ramp:.3f}-t)/{ramp},0,1)" for start, end in windows
+    )
+    return f"volume='1-{1 - 10 ** (NARRATION_DUCK_DB / 20):.4f}*min(1,{inside})':eval=frame"
+
+
+def _narrated(dialogue: Path, narration: list[tuple[Path, float, float]], runtime: float, work: Path) -> Path:
+    """The dialogue stem ducked under the narrator, plus the narration at the dialogue's loudness."""
+    raw = work / "narration_raw.wav"
+    _mix_inputs([(path, start, None, 0.0) for path, start, _ in narration], runtime, raw)
+    stem = work / "narration.wav"
+    ffmpeg.loudnorm_two_pass(raw, stem)
+    voice = work / "voice.wav"
+    duck = duck_under([(start, end) for _, start, end in narration])
+    ffmpeg.run([
+        "ffmpeg", "-y", "-v", "error", "-i", str(dialogue), "-i", str(stem), "-filter_complex",
+        f"[0:a]{duck}[d];[d][1:a]amix=inputs=2:normalize=0:duration=first[out]",
+        "-map", "[out]", "-ar", str(SAMPLE_RATE), str(voice),
+    ])
+    return voice
+
+
+def _sound(
+    ctx: RunContext, plan: ResolvedPlan, flow: Flow, work: Path, narration: list[tuple[Path, float, float]],
+) -> tuple[Path, ffmpeg.Loudness | None]:
+    """`plan` is the episode's own plan; the mix runs on it shifted past the opening.
+
+    `narration` is each line's (file, start, end) in the finished episode.
+    """
     chosen = read_takes(ctx, f"scenes_{flow}")
     sound = read_takes(ctx, "sound")
     timeline = shifted(plan, OPENING_SECONDS)
@@ -189,6 +228,8 @@ def _sound(ctx: RunContext, plan: ResolvedPlan, flow: Flow, work: Path) -> tuple
         loudness = ffmpeg.loudnorm_two_pass(raw_dialogue, dialogue)
     else:
         raw_dialogue.replace(dialogue)
+    if narration:
+        dialogue = _narrated(dialogue, narration, timeline.runtime_s, work)
 
     cues = []
     for c in timeline.cues:
@@ -212,6 +253,18 @@ def _sound(ctx: RunContext, plan: ResolvedPlan, flow: Flow, work: Path) -> tuple
     return mix, loudness
 
 
+def _clip_left(ctx: RunContext, plan: ResolvedPlan, flow: Flow) -> dict[str, float]:
+    """Seconds of each take's clip that the as-shot plan does not play yet; none for a slowed or frozen take."""
+    chosen = read_takes(ctx, f"scenes_{flow}")
+    left = {}
+    for take in scene_takes(plan, flow):
+        if any(shot.speed != 1.0 or shot.freeze_at is not None for shot in take.shots):
+            continue
+        clip = min(ffmpeg.duration(Path(chosen[take.id].chosen)), MAX_TAKE_SECONDS)
+        left[take.id] = max(0.0, clip - take.duration)
+    return left
+
+
 def without_title_super(plan: ResolvedPlan) -> ResolvedPlan:
     """The plan without its first time super, which the opening title already shows."""
     for shot in plan.shots:
@@ -221,6 +274,17 @@ def without_title_super(plan: ResolvedPlan) -> ResolvedPlan:
                 shots = [s.model_copy(update={"overlays": kept}) if s is shot else s for s in plan.shots]
                 return plan.model_copy(update={"shots": shots})
     return plan
+
+
+def text_plan(
+    plan: ResolvedPlan, flow: Flow, spans: dict[str, tuple[float, float]], real: dict[str, tuple[float, float]],
+) -> ResolvedPlan:
+    """The timeline the cards and labels are drawn on.
+
+    A shot whose real cuts were found stays on them, so its name card sits on
+    its own picture; any other lined shot is timed to its spoken words.
+    """
+    return retimed(plan, scene_takes(plan, flow), {shot: span for shot, span in spans.items() if shot not in real})
 
 
 def title_lines(ctx: RunContext, plan: ResolvedPlan) -> list[str]:
@@ -240,16 +304,27 @@ def run_cut(ctx: RunContext, flow: Flow) -> None:
     stage_dir = ctx.paths.stage_dir(f"cut_{flow}")
     work = stage_dir / "work"
     spans, captions, played = read_timing(ctx, flow)
-    # the edit follows the clips: a take the model spoke past its plan plays longer
-    plan = as_shot(planned, scene_takes(planned, flow), played)
+    real, _ = read_shots(ctx, flow)
+    spoken = read_narration(ctx)
+    # the edit follows the clips: a take the model spoke past its plan plays longer, and cuts where its clip does
+    plan = as_shot(planned, scene_takes(planned, flow), played, real)
+    if spoken:
+        # and a take whose narrator outlasts it plays more of its clip: narration is never cut off
+        extras = narration_extras(plan, scene_takes(plan, flow), spoken, _clip_left(ctx, plan, flow), spans)
+        captions = moved_captions(captions, scene_takes(plan, flow), extras)
+        played = {**played, **{take: played[take] + more for take, more in extras.items()}}
+        plan = as_shot(planned, scene_takes(planned, flow), played, real)
     extra = plan.runtime_s - planned.runtime_s
     timeline = shifted(plan, OPENING_SECONDS)
+    starts = {beat: at + OPENING_SECONDS for beat, at in narration_starts(plan, spoken).items()}
+    narration = [(Path(n.audio), starts[n.beat], starts[n.beat] + n.duration) for n in spoken]
     picture, edl = _picture(ctx, plan, flow, work)
-    mix, loudness = _sound(ctx, plan, flow, work)
+    mix, loudness = _sound(ctx, plan, flow, work, narration)
 
-    shown = without_title_super(shifted(retimed(plan, scene_takes(plan, flow), spans), OPENING_SECONDS))
+    shown = without_title_super(shifted(text_plan(plan, flow, spans, real), OPENING_SECONDS))
     pages = [c.model_copy(update={"start": c.start + OPENING_SECONDS, "end": c.end + OPENING_SECONDS})
              for c in captions]
+    pages = without_overlap(pages + [page for n in spoken for page in narration_pages(n, starts[n.beat])])
     title = opening_title(title_lines(ctx, plan), OPENING_SECONDS, bible.overlays)
     chain = video_chain(shown, bible, work / "text", captions=pages, title=title, picture=timeline)
     filter_script = work / "video_filters.txt"
@@ -267,6 +342,12 @@ def run_cut(ctx: RunContext, flow: Flow) -> None:
 
     problems = ffmpeg.validate_master(final, min_s=low, max_s=high + OPENING_SECONDS + extra)
     (stage_dir / "edl.yaml").write_text(yaml.safe_dump(edl, sort_keys=False), encoding="utf-8")
+    (stage_dir / "narration.yaml").write_text(yaml.safe_dump(
+        [{"beat": n.beat, "start": round(starts[n.beat], 3), "end": round(starts[n.beat] + n.duration, 3)}
+         for n in spoken], sort_keys=False), encoding="utf-8")
+    (stage_dir / "captions.yaml").write_text(yaml.safe_dump(
+        [page.model_dump(mode="json") for page in pages], allow_unicode=True, sort_keys=False, width=10000),
+        encoding="utf-8")
     report = {
         "runtime_s": ffmpeg.duration(final),
         "dialogue_lufs": None if loudness is None else loudness.i,
@@ -278,5 +359,5 @@ def run_cut(ctx: RunContext, flow: Flow) -> None:
         raise RuntimeError("Master check failed:\n- " + "\n- ".join(problems))
 
 
-register(Stage(name="cut_seedance", requires=("scenes_seedance", "sound"), gate=None,
+register(Stage(name="cut_seedance", requires=("scenes_seedance", "narration", "sound"), gate=None,
                run=partial(run_cut, flow="seedance")))

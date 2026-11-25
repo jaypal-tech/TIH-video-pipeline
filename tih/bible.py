@@ -16,6 +16,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 TOKEN = re.compile(r"\[([A-Za-z0-9_]+)\]")
+NARRATOR_ID = "narrator"  # the narrator's key among the speakers and the voice locks
 
 
 class Grade(BaseModel):
@@ -56,6 +57,16 @@ class Character(BaseModel):
     screen_name: str | None = None  # what a scene prompt calls them, e.g. THE ACTOR
     scene_look: str | None = None  # how a scene prompt describes them
     scene_voice: str | None = None  # how a scene prompt describes their voice
+
+
+class Narrator(BaseModel):
+    """The voice that sets up and closes each episode; never seen."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    voice: str
+    direction: str = ""  # how the lines are read, in the words a line's direction uses (e.g. quick)
+    tempo: float = Field(default=1.0, ge=1.0, le=1.3)  # the recorded lines are played this much faster, same pitch
 
 
 class Place(BaseModel):
@@ -105,6 +116,7 @@ class Bible(BaseModel):
     style: Style
     naming_policy: str = "appearance"
     characters: dict[str, Character]
+    narrator: Narrator | None = None
     places: dict[str, Place]
     props: dict[str, str] = Field(default_factory=dict)
     motifs: dict[str, str] = Field(default_factory=dict)

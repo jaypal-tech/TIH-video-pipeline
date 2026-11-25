@@ -186,6 +186,12 @@ characters:
       jacket, checked trousers, a pocket watch
     voice: null # silent in ep 5
 
+# The narrator sets up and closes each episode and is never seen. The voice is
+# designed once in casting and locked like a character's: tih lock voice narrator.
+narrator:
+  voice: "a calm, low, unhurried American male storyteller in his fifties, warm and grave, close to the microphone, no theatrical emphasis"
+  tempo: 1.15 # the stock voice reads slowly; played a little faster, each line stays inside its shot
+
 places:
   L1:
     name: White House north lawn, the crowd

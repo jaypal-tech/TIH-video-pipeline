@@ -10,7 +10,7 @@ variants; pipeline.yaml picks one per endpoint with a `{name}` template.
 import re
 from typing import TYPE_CHECKING, Callable
 
-from tih.bible import TOKEN, Bible, Character, Place
+from tih.bible import TOKEN, Bible, Character, Narrator, Place
 from tih.shots import Cue, Opening, ResolvedShot, SceneRule
 
 if TYPE_CHECKING:  # tih.scenes imports tih.stages.voice, which imports this module
@@ -160,6 +160,10 @@ def voice_design_brief(character: Character) -> str:
     return f"{voice}. {role(character)}. Clean close-mic studio recording, no music, no reverb."
 
 
+def narrator_voice_brief(narrator: Narrator) -> str:
+    return f"{narrator.voice.strip().rstrip('.')}. Clean close-mic studio recording, no music, no reverb."
+
+
 VOICE_PREVIEW_LIMIT = 500  # MiniMax voice design's preview_text maximum
 
 
@@ -297,7 +301,7 @@ def _seedance_shot(
         header += f" Setting: {_sentence(setting)}"
     who = [f"{name(cid)} - {_scene_text(bible.characters[cid])}." for cid in shot.cast]
     action = [_tokens(_setting_words(text, bible, "this setting"), bible, name) for text in (shot.keyframe, shot.motion)]
-    if shot.line:
+    if shot.spoken:
         speaker = _screen_name(_speaker(shot, bible))
         if _off_screen(shot, bible):
             ending = f'Off-screen, the voice of {speaker} says: "{shot.line}"'
@@ -334,7 +338,7 @@ def _seedance_scene(take: "SceneTake", bible: Bible) -> str:
         paragraphs.append(_seedance_shot(number, start, clock, shot, bible, setting))
     voices = []
     for shot in shots:
-        if shot.line:
+        if shot.spoken:
             speaker = _speaker(shot, bible)
             sentence = f"{_screen_name(speaker).title()} is {_plain(speaker.scene_voice or speaker.voice or '').rstrip('.')}."
             if sentence not in voices:
@@ -394,7 +398,7 @@ def _veo_scene(take: "SceneTake", bible: Bible, plate: bool) -> str:
     if rule:
         lines.append("Lighting: " + _sentence(_plain(rule.light)))
     style = [part.strip() for part in _plain(bible.style.look).rstrip(".").split(",")]
-    if shot.line:
+    if shot.spoken:
         speaker = _speaker(shot, bible)
         voice = _plain(speaker.voice or "").rstrip(".")
         voice_sentence = f" Voice: {voice[0].upper()}{voice[1:]}." if voice else ""

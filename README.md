@@ -36,8 +36,9 @@ tih run 1 --stage shotplan $S      # resolve the plan against script and bible (
 tih run 1 --stage casting $S       # candidate looks and voices (paid, only unlocked characters)
 tih lock look booth --image <chosen.png> --seed 1866 $S
 tih lock voice booth --voice-id <id> $S
+tih lock voice narrator --voice-id <id> $S  # once per series, when a script has narration
 tih approve 1 look $S              # Look Lock: bible, locks and the shot plan
-tih episode 1 $S --flow seedance   # scenes_seedance, sound, cut_seedance
+tih episode 1 $S --flow seedance   # narration, scenes_seedance, sound, cut_seedance
 ```
 
 The finished file is `runs/<s>/ep01/cut_seedance/final.mp4`. The cut fails unless

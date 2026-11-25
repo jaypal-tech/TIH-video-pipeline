@@ -176,3 +176,9 @@ def test_record_stage_writes_outputs(tmp_path, monkeypatch):
     assert script["clips"][1]["beats"][1]["line"]["source_id"] == "basler_last_address"
     assert "That means … citizenship." in canon["reported"]
     assert len(outline) == 30
+
+
+def test_extra_real_words_join_the_canon_with_their_source(canon):
+    sentence = "It is also unsatisfactory to some that the elective franchise is not given to the colored man."
+    assert sentence in canon.real_words
+    assert canon.provenance[sentence].source_id == "basler_last_address"

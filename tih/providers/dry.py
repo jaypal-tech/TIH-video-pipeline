@@ -2,7 +2,8 @@
 
 `tih rehearse` runs a whole episode through every stage with this transport:
 stills are flat colour frames labelled with their prompt, videos hold the
-still, speech is a tone as long as the line, transcripts echo the line. The
+still (a scene take is a flat colour per shot, cut at its planned times), speech
+is a tone as long as the line, transcripts echo the line. The
 ledger still prices every call from models.yaml, so a rehearsal tells you
 what the real run should cost, and the final cut shows timing, captions and
 cards exactly as they will be.
@@ -16,11 +17,12 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from tih.briefs import SPOKEN
+from tih.briefs import SHOT_HEADER, SPOKEN
 from tih.media.ffmpeg import extract_audio
 
 PAUSE_TAG = re.compile(r"<#[0-9.]+#>")
 SECONDS_PER_WORD = 0.38
+SHOT_COLOURS = ("0x303a4a", "0xd0d0c0", "0x101820", "0x909aa0")  # far apart, so every planned cut is a real one
 
 
 def _ffmpeg(args: list[str]) -> None:
@@ -112,7 +114,8 @@ class DryRunTransport:
         if kind == "video" and not ({"image_url", "start_image_url"} & arguments.keys()):
             seconds = float(str(arguments.get("duration", "5")).rstrip("s"))
             text = " ".join(SPOKEN.findall(str(arguments.get("prompt", ""))))
-            url = self._url(request_id, ".mp4", {"kind": "scene", "seconds": seconds, "text": text})
+            cuts = [float(start) for start, _ in SHOT_HEADER.findall(str(arguments.get("prompt", "")))][1:]
+            url = self._url(request_id, ".mp4", {"kind": "scene", "seconds": seconds, "text": text, "cuts": cuts})
             return {"video": {"url": url}}
         if kind == "video":
             image = self.uploads[str(arguments.get("start_image_url", arguments.get("image_url")))]
@@ -142,9 +145,13 @@ class DryRunTransport:
         elif kind == "scene":
             # A pitch per spoken text keeps scenes of equal length from sharing one transcript.
             pitch = 180 + int(hashlib.sha256(spec["text"].encode()).hexdigest()[:4], 16) % 400
-            _ffmpeg(["-f", "lavfi", "-i", f"color=c=0x303a4a:s=720x1280:r=24:d={spec['seconds']}",
+            # a new flat colour at each planned cut, so the stage finds the cuts it would find in a real clip
+            shots = ["null", *(
+                f"drawbox=w=iw:h=ih:t=fill:color={SHOT_COLOURS[number % len(SHOT_COLOURS)]}:enable='gte(t,{at})'"
+                for number, at in enumerate(spec["cuts"], start=1))]
+            _ffmpeg(["-f", "lavfi", "-i", f"color=c={SHOT_COLOURS[0]}:s=720x1280:r=24:d={spec['seconds']}",
                      "-f", "lavfi", "-i", f"sine=frequency={pitch}:duration={spec['seconds']}",
-                     "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                     "-vf", ",".join(shots), "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                      "-c:a", "aac", "-shortest", "-f", "mp4", out])
             sound = _sha(extract_audio(Path(out), Path(out).with_suffix(".dry.wav")))
             Path(out).with_suffix(".dry.wav").unlink()

@@ -10,12 +10,17 @@ class Evidence(StrEnum):
     accounts_say = "accounts_say"
     true_card = "true_card"
     dramatized = "dramatized"
+    narration = "narration"  # the narrator stating fact: never a quote, never invented
 
 
 class Delivery(StrEnum):
     face = "face"
     off = "off"
     inner = "inner"
+    narration = "narration"  # the narrator, over the picture; nobody on screen speaks
+
+
+NARRATOR = "NARRATOR"  # the speaker of every narration line
 
 
 class StoryFunction(StrEnum):

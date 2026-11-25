@@ -123,7 +123,7 @@ def test_shot_plan_answer_format_asks_for_the_opening():
     assert "opening" in schema["properties"]
     assert "opening" not in schema.get("required", [])
     opening = Opening.model_json_schema()
-    assert set(opening["properties"]) == {"place", "keyframe", "motion", "sound"}
+    assert set(opening["properties"]) == {"place", "keyframe", "motion", "sound", "line"}
 
 
 def test_scene_sides_accept_claude_rows_and_plan_maps():

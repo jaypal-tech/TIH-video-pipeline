@@ -119,7 +119,7 @@ def ask_json(
         ctx.ledger.update(
             call_id, status="error", kept=False, reject_reason=type(error).__name__
         )
-        raise LlmError(f"Claude call failed: {type(error).__name__}") from error
+        raise LlmError(f"Claude call failed: {type(error).__name__}: {str(error)[:800]}") from error
 
     cost = token_cost(
         ctx.models_file, MODEL, message.usage.input_tokens, message.usage.output_tokens

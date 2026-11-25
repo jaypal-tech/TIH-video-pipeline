@@ -5,7 +5,10 @@ text-to-video call. Its sound is transcribed and compared word for word with
 the script, as the voice stage does: a take that adds, drops or changes a word,
 speaks where nobody should, or runs its line past its end is rejected with the
 reason and taken again. The chosen takes' word timings give each lined shot its
-spoken span and the caption pages for the edit.
+spoken span and the caption pages for the edit. Each chosen clip's real cuts
+are found too: where they match the plan, timing.yaml gives every shot its real
+start and end in the clip (`shots`), and the edit follows them; where they do
+not, the take is marked `cuts: unmatched` and keeps its planned times.
 
 Only the Seedance flow is built: words only, no image of any kind is sent.
 
@@ -42,8 +45,8 @@ from tih.production import (
 )
 from tih.providers.fal import GatewayContext, upload_local
 from tih.scenes import (
-    MAX_TAKE_SECONDS, MAX_TAKE_SHOTS, OPENING_ID, Caption, Flow, SceneTake, as_shot, caption_pages, line_spans, opening_take,
-    request_seconds, scene_takes,
+    MAX_TAKE_SECONDS, MAX_TAKE_SHOTS, OPENING_ID, Caption, Flow, SceneTake, as_shot, caption_pages, kept_cuts, line_spans, opening_take,
+    real_shots, request_seconds, scene_takes,
 )
 from tih.shots import PlanError
 from tih.stages.registry import RunContext, Stage, register
@@ -142,14 +145,21 @@ def run_scenes(ctx: RunContext, flow: Flow) -> None:
     spans: dict[str, list[float]] = {}
     captions: list[dict] = []
     played = {scene.id: played_length(scene, clip) for scene, (_, (_, _, clip)) in zip(scenes, results)}
+    # the model does not cut at the prompt's times: where a clip's real cuts match its plan, its shots follow them
+    real: dict[str, tuple[float, float]] = {}
+    for scene in scenes[1:]:
+        real.update(real_shots(scene, ffmpeg.cut_times(Path(sets[scene.id].chosen)), played[scene.id]) or {})
+    real = kept_cuts(plan, scenes, played, real, flow)
+    cuts = {scene.id: "matched" if scene.shots[0].id in real else "unmatched" for scene in scenes[1:]}
     # captions are timed on the as-shot timeline: each take starts where the longer takes before it end
-    shot_plan = as_shot(plan, scenes, played)
+    shot_plan = as_shot(plan, scenes, played, real)
     shot_takes = {take.id: take for take in [opening_take(shot_plan), *scene_takes(shot_plan, flow)]}
     for scene, (_, (chosen_spans, words, _)) in zip(scenes, results):
         spans.update({shot: list(span) for shot, span in chosen_spans.items()})
         captions += [page.model_dump(mode="json") for page in caption_pages(shot_takes[scene.id], words)]
     (stage_dir / TIMING_FILE).write_text(
-        yaml.safe_dump({"spans": spans, "captions": captions, "played": played},
+        yaml.safe_dump({"spans": spans, "captions": captions, "played": played,
+                        "shots": {shot: list(span) for shot, span in real.items()}, "cuts": cuts},
                        allow_unicode=True, sort_keys=False, width=10000),
         encoding="utf-8",
     )
@@ -158,11 +168,16 @@ def run_scenes(ctx: RunContext, flow: Flow) -> None:
 MIN_SPLIT_SECONDS = 5.0  # a long scene may be two or three generations, never a short leftover
 
 
+def _alone(take: SceneTake) -> bool:
+    return len(take.shots) == 1 and (take.shots[0].speed != 1.0 or take.shots[0].freeze_at is not None)
+
+
 def _one_take_per_clip(takes: list[SceneTake]) -> None:
     """Each clip is one generation; a plan that splits a clip is stopped before anything is paid."""
     for clip in dict.fromkeys(take.clip for take in takes):
         mine = [take for take in takes if take.clip == clip]
-        if len(mine) == 1 or all(take.duration >= MIN_SPLIT_SECONDS for take in mine):
+        split = [take for take in mine if not _alone(take)]  # a slowed or frozen shot is always its own take
+        if len(mine) == 1 or all(take.duration >= MIN_SPLIT_SECONDS for take in split):
             continue
         shots = [shot for take in mine for shot in take.shots]
         seconds = sum(shot.duration for shot in shots)
@@ -270,6 +285,15 @@ def read_timing(
     spans = {shot: (float(span[0]), float(span[1])) for shot, span in (data.get("spans") or {}).items()}
     played = {str(take): float(seconds) for take, seconds in (data.get("played") or {}).items()}
     return spans, [Caption.model_validate(page) for page in data.get("captions") or []], played
+
+
+def read_shots(ctx: RunContext, flow: Flow) -> tuple[dict[str, tuple[float, float]], dict[str, str]]:
+    """Each shot's real (start, end) in its take's clip, where the clip's cuts matched its plan, and
+    each take's `matched` or `unmatched`."""
+    path = ctx.paths.scope_dir / f"scenes_{flow}" / TIMING_FILE
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    shots = {shot: (float(span[0]), float(span[1])) for shot, span in (data.get("shots") or {}).items()}
+    return shots, {str(take): str(state) for take, state in (data.get("cuts") or {}).items()}
 
 
 register(Stage(name="scenes_seedance", requires=("shotplan",), gate="look", run=partial(run_scenes, flow="seedance")))
