@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tih.bible import Bible, check_forbidden, expand, series_dir, tokens_in
 from tih.paths import RunPaths
@@ -68,6 +68,15 @@ OPENING_SIZES = ("WIDE", "MEDIUM")
 MAX_SAME_FACE_RUN = 4
 
 
+class Placement(BaseModel):
+    """One cast member's side of the frame, as Claude writes it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    who: str
+    side: Side
+
+
 class SceneRule(BaseModel):
     """What holds for a whole clip: who stands where on screen, the light, the weather."""
 
@@ -77,6 +86,15 @@ class SceneRule(BaseModel):
     sides: dict[str, Side]
     light: str
     weather: str
+
+    # Claude's answer format cannot hold a free-form map, so it writes rows; plan files keep the map
+    @field_validator("sides", mode="before", json_schema_input_type=list[Placement])
+    @classmethod
+    def _rows_to_map(cls, value: object) -> object:
+        if isinstance(value, list):
+            rows = [Placement.model_validate(row) for row in value]
+            return {row.who: row.side for row in rows}
+        return value
 
 
 class ShotPlan(BaseModel):

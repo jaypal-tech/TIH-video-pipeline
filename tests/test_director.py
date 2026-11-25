@@ -1,11 +1,12 @@
 import shutil
 from pathlib import Path
 
+import anthropic
 import pytest
 
 from tih.gates import GateNotApproved, approve
 from tih.paths import RunPaths
-from tih.shots import ShotPlan, example_plan_path, load_plan, plan_path
+from tih.shots import SceneRule, ShotPlan, example_plan_path, load_plan, plan_path
 from tih.stages import director, registry
 from tih.stages.registry import RunContext, run_stage
 
@@ -97,3 +98,29 @@ def test_director_rejects_wrong_episode(ctx, tmp_path, monkeypatch):
     approve(ctx.paths, "script")
     with pytest.raises(director.DirectorFailed, match="episode 2"):
         run(ctx, tmp_path, monkeypatch, wrong_episode(), wrong_episode())
+
+
+def _empty_boxes(node, path="$"):
+    """Objects Claude's answer format leaves no room in: no properties and no extra keys allowed."""
+    found = []
+    if isinstance(node, dict):
+        if node.get("type") == "object" and not node.get("properties") and node.get("additionalProperties") is False:
+            found.append(path)
+        for key, value in node.items():
+            found += _empty_boxes(value, f"{path}.{key}")
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            found += _empty_boxes(value, f"{path}[{index}]")
+    return found
+
+
+def test_shot_plan_answer_format_has_room_for_every_field():
+    assert _empty_boxes(anthropic.transform_schema(ShotPlan)) == []
+
+
+def test_scene_sides_accept_claude_rows_and_plan_maps():
+    rows = SceneRule.model_validate({"clip": 1, "light": "l", "weather": "w",
+                                     "sides": [{"who": "booth", "side": "left"}, {"who": "powell", "side": "right"}]})
+    plan = SceneRule.model_validate({"clip": 1, "light": "l", "weather": "w",
+                                     "sides": {"booth": "left", "powell": "right"}})
+    assert rows.sides == plan.sides == {"booth": "left", "powell": "right"}
