@@ -99,6 +99,13 @@ def render_shot(
     )
 
 
+def extract_audio(source: Path, target: Path) -> Path:
+    """Mono 48 kHz 16-bit WAV of a video's sound; the same video always gives the same bytes."""
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(source), "-vn", "-ac", "1", "-ar", "48000",
+         "-c:a", "pcm_s16le", "-fflags", "+bitexact", "-flags:a", "+bitexact", str(target)])
+    return target
+
+
 def concat(parts: list[Path], target: Path) -> None:
     listing = target.with_suffix(".txt")
     listing.write_text(

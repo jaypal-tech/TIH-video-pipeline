@@ -251,7 +251,9 @@ def test_all_parts_conformed(tmp_path, monkeypatch):
     run_stage(source, "record")
     _staged(source)
     ctx = rehearse_episode(1, "lincoln", tmp_path / "dry", source=tmp_path / "src")
-    for part in sorted((ctx.paths.scope_dir / "cut" / "work" / "shots").glob("*.mp4")):
+    parts = sorted((ctx.paths.scope_dir / "cut_seedance" / "work" / "takes").glob("*.mp4"))
+    assert parts
+    for part in parts:
         probe = json.loads(subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
              "stream=width,height,r_frame_rate,pix_fmt,sample_aspect_ratio", "-of", "json", str(part)],

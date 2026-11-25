@@ -37,16 +37,16 @@ tih run 1 --stage casting $S       # candidate looks and voices (paid, only unlo
 tih lock look booth --image <chosen.png> --seed 1866 $S
 tih lock voice booth --voice-id <id> $S
 tih approve 1 look $S              # Look Lock: bible, locks and the shot plan
-tih episode 1 $S                   # keyframes, motion, voice, lipsync, sound, cut
+tih episode 1 $S --flow seedance   # scenes_seedance, sound, cut_seedance
 ```
 
-The finished file is `runs/<s>/ep01/cut/final.mp4`. The cut fails unless
+The finished file is `runs/<s>/ep01/cut_seedance/final.mp4`. The cut fails unless
 `validate_master` passes (codec, size, frame rate, runtime, audio).
 
 ## Rehearse first ($0)
 
 ```bash
-tih rehearse 1 $S
+tih rehearse 1 $S --flow seedance
 ```
 
 Needs the Writer and Director to have run for the episode. Copies the locked
@@ -58,15 +58,15 @@ estimated cost of the real run from `models.yaml`.
 ## Re-run one episode from its script
 
 ```bash
-tih episode 1 $S --from director --force
+tih episode 1 $S --flow seedance --from director --force
 ```
 
 Every stage runs again, but each generation call is matched to the earlier
 one by its fingerprint (endpoint, settings, prompt, input hashes) and reused,
 so nothing is paid twice. Only shots whose prompt or inputs changed cost money.
 
-To swap one take: `tih pick 1 keyframes 2.3 1`, then
-`tih episode 1 $S --from keyframes --force`.
+To swap one take: `tih pick 1 scenes_seedance 2.1 1`, then
+`tih episode 1 $S --flow seedance --from scenes_seedance --force`.
 
 ## Safety rails
 

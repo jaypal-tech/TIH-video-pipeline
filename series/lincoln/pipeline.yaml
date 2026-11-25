@@ -5,7 +5,7 @@
 # value (a list, a number); any other string is filled with str.format. A key
 # whose value would be empty (None) is left out.
 # Values available: prompt, prompt_gemini, prompt_seedream, prompt_kling,
-# prompt_hailuo, negative_video, image_url, image_urls, seed,
+# prompt_hailuo, prompt_seedance, prompt_veo, negative_video, image_url, image_urls, seed,
 # duration, text, voice_id, voice_description, preview_text, video_url,
 # audio_url, duration_seconds, length_ms.
 #
@@ -84,6 +84,18 @@ steps:
           duration: "{duration}"
           resolution: 1080P
           prompt_expansion_mode: disabled # otherwise it rewrites the prompt
+
+  scene_seedance: # the first Seedance film's route: words only, no references of any kind
+    endpoint: bytedance/seedance-2.0/text-to-video
+    estimate_usd: 4.60 # the 15 s maximum at $0.3034/s, rounded up
+    takes: 2 # a second take only if the first fails the word check
+    duration_range: [4, 15]
+    arguments:
+      prompt: "{prompt_seedance}"
+      duration: "{duration}"
+      aspect_ratio: "9:16"
+      resolution: 720p
+      generate_audio: true
 
   speech: # ElevenLabs directly, with the voice designed above; v3 reads … as a pause itself
     endpoint: elevenlabs-api/text-to-speech

@@ -27,7 +27,7 @@ def run_plates(ctx: RunContext) -> None:
 
     sets: dict[str, TakeSet] = {}
     for place in dict.fromkeys(shot.place for shot in plan.shots):
-        if place in locks.places:
+        if place in locks.places or not bible.places[place].plate:
             continue
         takes = []
         for take in range(config.takes):

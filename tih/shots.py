@@ -97,6 +97,17 @@ class SceneRule(BaseModel):
         return value
 
 
+class Opening(BaseModel):
+    """The silent 5-second establishing shot under the title; not one of the numbered shots."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    place: str  # a bible place id
+    keyframe: str  # what the camera sees: who is there and what they are doing
+    motion: str  # how the people and the camera move
+    sound: str  # the specific sounds heard, comma-separated
+
+
 class ShotPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -105,6 +116,7 @@ class ShotPlan(BaseModel):
     scenes: list[SceneRule] = Field(default_factory=list)
     shots: list[PlannedShot]
     cues: list[Cue] = Field(default_factory=list)
+    opening: Opening | None = None
 
 
 class ResolvedShot(PlannedShot):
@@ -129,6 +141,7 @@ class ResolvedPlan(BaseModel):
     scenes: list[SceneRule] = Field(default_factory=list)
     shots: list[ResolvedShot]
     cues: list[Cue]
+    opening: Opening | None = None
 
 
 class PlanError(ValueError):
@@ -181,6 +194,8 @@ def resolve_plan(
     rules = {rule.clip: rule for rule in plan.scenes}
     side_errors: set[str] = set()
     previous: PlannedShot | None = None
+    if plan.opening is not None and plan.opening.place not in bible.places:
+        errors.append(f"opening: unknown place {plan.opening.place}")
 
     for shot in plan.shots:
         where = f"shot {shot.id}"
@@ -321,6 +336,7 @@ def resolve_plan(
         scenes=plan.scenes,
         shots=resolved,
         cues=plan.cues,
+        opening=plan.opening,
     )
 
 

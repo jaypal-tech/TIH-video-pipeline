@@ -39,6 +39,7 @@ class Style(BaseModel):
     video_negative: str = ""
     sound_period: str = ""
     grade: Grade = Field(default_factory=Grade)
+    scene_look: str = ""  # one style sentence for whole-scene video prompts
 
 
 class Character(BaseModel):
@@ -51,6 +52,10 @@ class Character(BaseModel):
     voice: str | None = None
     must: list[str] = Field(default_factory=list)
     designed_face: bool = False
+    face_reference: bool = True  # false: never pass this face to a video model as a reference image
+    screen_name: str | None = None  # what a scene prompt calls them, e.g. THE ACTOR
+    scene_look: str | None = None  # how a scene prompt describes them
+    scene_voice: str | None = None  # how a scene prompt describes their voice
 
 
 class Place(BaseModel):
@@ -58,6 +63,8 @@ class Place(BaseModel):
 
     name: str
     look: str
+    plate: bool = True  # false: no empty-place plate is generated for this view
+    scene_look: str | None = None  # how a scene prompt describes the place
 
 
 class Forbidden(BaseModel):

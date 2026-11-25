@@ -5,28 +5,35 @@ placeholder media with ffmpeg and records every call in a temporary ledger.
 """
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
+from typer.testing import CliRunner
 
 from tih.bible import NotLocked, load_bible
 from tih.budget import BudgetGuard
-from tih.cli import rehearse_episode
-from tih.gates import ArtifactChanged, GateNotApproved, approve, require_approved
+from tih.cli import app, prepare_rehearsal, rehearse_episode
+from tih.gates import ArtifactChanged, GateNotApproved, approve, gate_artifacts, require_approved
 from tih.ledger import Ledger
+from tih.media import ffmpeg
 from tih.media.ffmpeg import duration, validate_master
+from tih.media.overlays import filters
 from tih.paths import RunPaths
 from tih.production import load_pipeline, load_resolved, read_takes, render_arguments
 from tih.providers.dry import DryRunTransport
 from tih.providers.fal import GatewayContext, generate
 from tih.assets import ShotRef
+from tih.scenes import FLOWS, OPENING_SECONDS, scene_takes, shifted
 from tih.series import load_series
 from tih.shots import PlanError, example_plan_path, load_plan, plan_path, resolve_plan
 from tih.stages.performance import model_duration, source_seconds
 from tih.stages import registry
+from tih.stages import cut
+from tih.stages.cut import played_seconds, without_title_super
 from tih.stages.registry import RunContext, run_stage
 from tih.stages.voice import line_pieces, slice_for_shot, speech_text, word_difference
 from tih.story.models import Episode
@@ -263,33 +270,82 @@ def test_rehearsal_needs_director(tmp_path):
         rehearse_episode(1, "lincoln", tmp_path / "dry", source=tmp_path / "empty")
 
 
-@pytest.mark.slow
-def test_rehearsal_makes_a_valid_master_and_reruns_free(tmp_path):
+def _rehearsed(tmp_path, flow):
     source = RunContext(paths=RunPaths("lincoln", 1, root=tmp_path / "src"))
     run_stage(source, "record")
     _staged(source)
-    root = tmp_path / "dry"
-    ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
-    final = ctx.paths.scope_dir / "cut" / "final.mp4"
+    return rehearse_episode(1, "lincoln", tmp_path / "dry", source=tmp_path / "src", flow=flow)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("flow", FLOWS[:1])  # the veo flow is not built yet
+def test_rehearsal_makes_a_valid_master_and_reruns_free(tmp_path, flow):
+    ctx = _rehearsed(tmp_path, flow)
+    final = ctx.paths.scope_dir / f"cut_{flow}" / "final.mp4"
     assert validate_master(final) == []
-    check = json.loads((ctx.paths.scope_dir / "cut" / "master_check.json").read_text())
+    check = json.loads((ctx.paths.scope_dir / f"cut_{flow}" / "master_check.json").read_text())
     assert abs(check["dialogue_lufs"] + 16) <= 1
 
-    ledger = Ledger(root / "lincoln" / "calls.jsonl")
+    ledger = Ledger(tmp_path / "dry" / "lincoln" / "calls.jsonl")
     calls = ledger.current()
     assert all(r.status == "ok" for r in calls)
-    assert {r.step for r in calls} >= {"look", "voice_design", "keyframe", "video", "voice",
-                                       "transcribe", "lipsync", "music", "sfx"}
-    keyframes = read_takes(ctx, "keyframes")
-    chosen = {t.chosen_call_id for t in keyframes.values()}
+    assert {r.step for r in calls} >= {"look", "voice_design", "scene", "transcribe", "music", "sfx"}
+    assert not {r.step for r in calls} & {"keyframe", "video", "voice", "lipsync"}
+    scenes = read_takes(ctx, f"scenes_{flow}")
+    chosen = {t.chosen_call_id for t in scenes.values()}
     for record in calls:
-        if record.step == "keyframe":
+        if record.step == "scene":
             assert record.kept is (record.call_id in chosen)
 
     count = len(calls)
-    for stage in ("keyframes", "motion", "voice", "lipsync", "sound"):
+    for stage in (f"scenes_{flow}", "sound"):
         run_stage(ctx, stage, force=True)
     assert len(ledger.current()) == count
+
+    approved = CliRunner().invoke(app, ["approve", "1", "picture", "--series", "lincoln",
+                                        "--root", str(tmp_path / "dry")])
+    assert approved.exit_code == 0, approved.output
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("flow", FLOWS[:1])  # the veo flow is not built yet
+def test_rehearsal_cut_opens_with_the_title_and_one_part_per_take(tmp_path, flow):
+    ctx = _rehearsed(tmp_path, flow)
+    plan = load_resolved(ctx)
+    edl = yaml.safe_load((ctx.paths.stage_dir(f"cut_{flow}") / "edl.yaml").read_text())
+    assert [row["take"] for row in edl] == ["0", *(t.id for t in scene_takes(plan, flow))]
+    assert edl[0]["record_in"] == 0.0 and edl[1]["record_in"] == OPENING_SECONDS
+    final = ctx.paths.stage_dir(f"cut_{flow}") / "final.mp4"
+    assert ffmpeg.duration(final) == pytest.approx(plan.runtime_s + OPENING_SECONDS, abs=0.2)
+
+
+def test_episode_command_needs_a_known_flow():
+    result = CliRunner().invoke(app, ["episode", "1", "--series", "lincoln", "--flow", "kling"])
+    assert result.exit_code != 0
+
+
+def test_episode_command_refuses_the_veo_flow_for_now(tmp_path):
+    result = CliRunner().invoke(app, ["episode", "1", "--series", "lincoln", "--flow", "veo",
+                                      "--root", str(tmp_path)])
+    assert result.exit_code != 0
+    assert "the veo flow is not built yet" in result.output
+    assert not (tmp_path / "lincoln").exists()
+
+
+def test_take_sound_plays_only_as_long_as_its_picture_moves(episode_one):
+    plan = resolve_plan(load_plan(example_plan_path("lincoln")), episode_one, load_bible("lincoln"))
+    takes = {t.id: t for t in scene_takes(plan, "seedance")}
+    assert played_seconds(takes["1.1"]) == takes["1.1"].duration  # several shots: the whole take
+    assert played_seconds(takes["5.2"]) == 0.75  # shot 5.3, 1.5 s at half speed
+    assert played_seconds(takes["5.4"]) == 4.0  # shot 5.6 freezes at 4.0 s
+
+
+def test_no_shot_text_is_drawn_during_the_opening(episode_one, tmp_path):
+    bible = load_bible("lincoln")
+    plan = resolve_plan(load_plan(example_plan_path("lincoln")), episode_one, bible)
+    chain = filters(shifted(plan, OPENING_SECONDS), bible.overlays, tmp_path / "text")
+    starts = [float(m) for f in chain for m in re.findall(r"between\(t,([0-9.]+),", f)]
+    assert starts and min(starts) >= OPENING_SECONDS
 
 
 def test_shotplan_reads_writer_script(tmp_path):
@@ -390,17 +446,20 @@ def test_second_rehearsal_uses_new_plan(tmp_path):
     run_stage(source, "record")
     _staged(source)
     root = tmp_path / "dry"
-    rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
+    first = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
+    takes = scene_takes(load_resolved(first), "seedance")
     plan = plan_path(source.paths)
     data = yaml.safe_load(plan.read_text(encoding="utf-8"))
-    # move half a second from shot 1.2 to shot 1.1; the clip (and its ambience bed) keeps its length
-    longer = data["shots"][0]["duration"] + 0.5
-    data["shots"][0]["duration"] = longer
-    data["shots"][1]["duration"] -= 0.5
+    # move half a second from shot 1.5 (the second take's first) to shot 1.4 (the first take's last);
+    # the clip (and its ambience bed) keeps its length
+    assert (takes[0].shots[-1].id, takes[1].shots[0].id) == (data["shots"][3]["id"], data["shots"][4]["id"])
+    data["shots"][3]["duration"] += 0.5
+    data["shots"][4]["duration"] -= 0.5
     plan.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
-    edl = yaml.safe_load((ctx.paths.scope_dir / "cut" / "edl.yaml").read_text(encoding="utf-8"))
-    assert edl[0]["duration"] == longer
+    edl = yaml.safe_load((ctx.paths.scope_dir / "cut_seedance" / "edl.yaml").read_text(encoding="utf-8"))
+    assert edl[1]["duration"] == takes[0].duration + 0.5
+    assert edl[2]["record_in"] == OPENING_SECONDS + takes[0].duration + 0.5
 
 
 def test_slice_for_shot_boundaries():
@@ -439,7 +498,9 @@ def test_line_voiced_once_and_sliced_per_shot(tmp_path):
     run_stage(source, "record")
     _staged(source)
     root = tmp_path / "dry"
-    ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
+    ctx = prepare_rehearsal(1, "lincoln", root, source=tmp_path / "src")
+    for stage in ("keyframes", "motion", "voice", "lipsync"):  # the old stages, no longer in the rehearsal
+        run_stage(ctx, stage, force=True)
     plan = load_resolved(ctx)
     beats_with_lines = {s.beat for s in plan.shots if s.line}
     calls = [r for r in Ledger(root / "lincoln" / "calls.jsonl").current() if r.step == "voice"]
@@ -469,3 +530,96 @@ def test_voices_are_designed_and_spoken_on_elevenlabs_directly():
     assert steps["voice_design"].endpoint == "elevenlabs-api/voice-design"
     assert steps["speech"].endpoint == "elevenlabs-api/text-to-speech"
     assert steps["transcribe"].endpoint.startswith("fal-ai/")
+
+
+def test_extract_audio_is_repeatable(tmp_path):
+    video = tmp_path / "tone.mp4"
+    ffmpeg.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=s=160x90:d=1",
+                "-f", "lavfi", "-i", "sine=frequency=300:duration=1", "-shortest",
+                "-c:v", "libx264", "-c:a", "aac", str(video)])
+    first = ffmpeg.extract_audio(video, tmp_path / "a.wav").read_bytes()
+    second = ffmpeg.extract_audio(video, tmp_path / "b.wav").read_bytes()
+    assert first == second and len(first) > 1000
+
+
+def test_dry_scene_video_has_sound_and_a_known_transcript(tmp_path):
+    transport = DryRunTransport(tmp_path / "dry")
+    prompt = ('Shot 1 (0-3s, MCU, 85mm lens): a man waits. He says exactly: "Go on." '
+              'Shot 2 (3-5s, CU, 85mm lens): he looks up. He says exactly: "I\'m listening."')
+    endpoint = "bytedance/seedance-2.0/text-to-video"
+    url = transport.wait(endpoint, transport.submit(endpoint, {"prompt": prompt, "duration": "5"}))["video"]["url"]
+    video = tmp_path / "scene.mp4"
+    transport.download(url, video)
+    assert abs(duration(video) - 5.0) < 0.2
+    audio = ffmpeg.extract_audio(video, tmp_path / "scene.wav")
+    scribe = "fal-ai/elevenlabs/speech-to-text/scribe-v2"
+    heard = transport.wait(scribe, transport.submit(scribe, {"audio_url": transport.upload(audio)}))
+    assert heard["text"] == "Go on. I'm listening."
+    assert [w["text"] for w in heard["words"]] == ["Go", "on.", "I'm", "listening."]
+    assert heard["words"][-1]["end"] < 5.0
+
+
+def test_dry_scene_words_are_spread_inside_a_short_take(tmp_path):
+    transport = DryRunTransport(tmp_path / "dry")
+    words = " ".join(f"w{i}" for i in range(20))
+    endpoint = "bytedance/seedance-2.0/text-to-video"
+    prompt = f'Shot 1 (0-4s, CU): he says exactly: "{words}"'
+    url = transport.wait(endpoint, transport.submit(endpoint, {"prompt": prompt, "duration": "4"}))["video"]["url"]
+    transport.download(url, tmp_path / "scene.mp4")
+    audio = ffmpeg.extract_audio(tmp_path / "scene.mp4", tmp_path / "scene.wav")
+    scribe = "fal-ai/elevenlabs/speech-to-text/scribe-v2"
+    heard = transport.wait(scribe, transport.submit(scribe, {"audio_url": transport.upload(audio)}))
+    assert len(heard["words"]) == 20 and heard["words"][-1]["end"] <= 4.0
+
+
+def test_dry_scenes_of_equal_length_with_different_lines_sound_different(tmp_path):
+    transport = DryRunTransport(tmp_path / "dry")
+    endpoint = "bytedance/seedance-2.0/text-to-video"
+    scribe = "fal-ai/elevenlabs/speech-to-text/scribe-v2"
+    heard, sounds = [], []
+    for name, line in (("a", "Go on."), ("b", "Not in this crowd.")):
+        prompt = f'Shot 1 (0-6s, CU): he says exactly: "{line}"'
+        url = transport.wait(endpoint, transport.submit(endpoint, {"prompt": prompt, "duration": "6"}))["video"]["url"]
+        transport.download(url, tmp_path / f"{name}.mp4")
+        audio = ffmpeg.extract_audio(tmp_path / f"{name}.mp4", tmp_path / f"{name}.wav")
+        sounds.append(audio.read_bytes())
+        heard.append(transport.wait(scribe, transport.submit(scribe, {"audio_url": transport.upload(audio)}))["text"])
+    assert sounds[0] != sounds[1]
+    assert heard == ["Go on.", "Not in this crowd."]
+
+
+def test_picture_gate_covers_the_seedance_master(tmp_path):
+    paths = RunPaths("lincoln", 1, root=tmp_path)
+    assert gate_artifacts(paths, "picture") == [paths.scope_dir / "cut_seedance" / "final.mp4"]
+
+
+def test_pick_hint_reruns_the_flow_from_a_scene_take(tmp_path):
+    result = CliRunner().invoke(app, ["pick", "1", "scenes_seedance", "2.1", "1", "--series", "lincoln",
+                                      "--root", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "tih episode 1 --series lincoln --flow seedance --from scenes_seedance --force" in result.output
+    picks = yaml.safe_load((RunPaths("lincoln", 1, root=tmp_path).scope_dir / "picks.yaml").read_text())
+    assert picks == {"scenes_seedance": {"2.1": 1}}
+
+
+def test_pick_hint_for_a_stage_outside_the_flows_reruns_that_stage(tmp_path):
+    result = CliRunner().invoke(app, ["pick", "1", "keyframes", "2.3", "1", "--series", "lincoln",
+                                      "--root", str(tmp_path)])
+    assert "tih run 1 --stage keyframes --series lincoln --force" in result.output
+
+
+def test_the_title_time_super_is_drawn_only_in_the_opening(episode_one):
+    plan = resolve_plan(load_plan(example_plan_path("lincoln")), episode_one, load_bible("lincoln"))
+    kinds = lambda p: [(s.id, o.kind) for s in p.shots for o in s.overlays]
+    dropped = without_title_super(plan)
+    assert ("1.1", "time_super") in kinds(plan)
+    assert kinds(dropped) == [k for k in kinds(plan) if k != ("1.1", "time_super")]
+
+
+def test_take_sound_fades_only_briefly_at_its_edges(monkeypatch, tmp_path):
+    assert cut.TAKE_FADE == 0.05
+    seen = []
+    monkeypatch.setattr(cut.ffmpeg, "run", lambda args, **_: seen.append(args) or "")
+    cut._mix_inputs([(tmp_path / "take.wav", 5.0, 9.5, 0.0)], 20.0, tmp_path / "d.wav", fade=cut.TAKE_FADE)
+    graph = seen[0][seen[0].index("-filter_complex") + 1]
+    assert "afade=t=in:d=0.050" in graph and "afade=t=out:st=9.450:d=0.050" in graph

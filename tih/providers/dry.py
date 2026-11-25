@@ -15,6 +15,9 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from tih.briefs import SPOKEN
+from tih.media.ffmpeg import extract_audio
+
 PAUSE_TAG = re.compile(r"<#[0-9.]+#>")
 SECONDS_PER_WORD = 0.38
 
@@ -56,6 +59,7 @@ class DryRunTransport:
         saved = json.loads(self.uploads_file.read_text()) if self.uploads_file.exists() else {}
         self.uploads: dict[str, Path] = {url: Path(path) for url, path in saved.items()}
         self.spoken: dict[str, str] = {}
+        self.lengths: dict[str, float] = {}  # seconds of each scene take's sound, by hash
 
     def submit(self, endpoint: str, arguments: dict[str, Any]) -> str:
         digest = hashlib.sha256(
@@ -76,9 +80,13 @@ class DryRunTransport:
         if kind == "transcript":
             source = self.uploads.get(str(arguments.get("audio_url")))
             text = self.spoken.get(_sha(source), "") if source else ""
+            length = self.lengths.get(_sha(source)) if source else None
+            step = SECONDS_PER_WORD
+            if length and len(text.split()) * step > length:
+                step = length / len(text.split())  # spread the words evenly inside the take
             timed = [
-                {"text": word, "start": round(i * SECONDS_PER_WORD, 3),
-                 "end": round((i + 1) * SECONDS_PER_WORD - 0.05, 3), "type": "word"}
+                {"text": word, "start": round(i * step, 3),
+                 "end": round((i + 1) * step - 0.05, 3), "type": "word"}
                 for i, word in enumerate(text.split())
             ]
             return {"text": text, "words": timed}
@@ -98,6 +106,11 @@ class DryRunTransport:
         if kind == "lipsync":
             video = self.uploads[str(arguments["video_url"])]
             url = self._url(request_id, ".mp4", {"kind": "copy", "source": str(video)})
+            return {"video": {"url": url}}
+        if kind == "video" and not ({"image_url", "start_image_url"} & arguments.keys()):
+            seconds = float(str(arguments.get("duration", "5")).rstrip("s"))
+            text = " ".join(SPOKEN.findall(str(arguments.get("prompt", ""))))
+            url = self._url(request_id, ".mp4", {"kind": "scene", "seconds": seconds, "text": text})
             return {"video": {"url": url}}
         if kind == "video":
             image = self.uploads[str(arguments.get("start_image_url", arguments.get("image_url")))]
@@ -123,6 +136,17 @@ class DryRunTransport:
             _ffmpeg(["-loop", "1", "-i", spec["source"], "-t", f"{spec['seconds']}", "-r", "24",
                      "-vf", "format=yuv420p", "-c:v", "libx264", "-preset", "ultrafast",
                      "-f", "mp4", out])
+        elif kind == "scene":
+            # A pitch per spoken text keeps scenes of equal length from sharing one transcript.
+            pitch = 180 + int(hashlib.sha256(spec["text"].encode()).hexdigest()[:4], 16) % 400
+            _ffmpeg(["-f", "lavfi", "-i", f"color=c=0x303a4a:s=720x1280:r=24:d={spec['seconds']}",
+                     "-f", "lavfi", "-i", f"sine=frequency={pitch}:duration={spec['seconds']}",
+                     "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                     "-c:a", "aac", "-shortest", "-f", "mp4", out])
+            sound = _sha(extract_audio(Path(out), Path(out).with_suffix(".dry.wav")))
+            Path(out).with_suffix(".dry.wav").unlink()
+            self.spoken[sound] = spec["text"]
+            self.lengths[sound] = spec["seconds"]
         elif kind == "copy":
             Path(out).write_bytes(Path(spec["source"]).read_bytes())
         elif kind == "tone":
