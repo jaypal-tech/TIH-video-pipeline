@@ -24,7 +24,8 @@ style:
   sound_period: "1865 setting, acoustic sources only, no modern or electronic sounds"
   grade: # applied once to the whole cut, before captions
     eq: "contrast=1.05:saturation=0.85:gamma=0.97"
-    grain: 6
+    balance: "rh=0.04:gh=0.01:bh=-0.05:rm=0.02:bm=-0.02" # warm highlights toward the app's gold
+    grain: 3 # light: heavy moving grain slows the encode and is lost to phone compression
   lenses:
     CU: 85
     ECU: 85
@@ -257,10 +258,19 @@ forbidden:
 
 # One look for every overlay, so episodes match on screen.
 overlays:
-  # Caladea (SIL OFL 1.1) ships in fonts/ so every machine renders the same.
-  font: fonts/Caladea-Regular.ttf
-  font_bold: fonts/Caladea-Bold.ttf
-  font_italic: fonts/Caladea-Italic.ttf
+  # The Today In History app's type and colours. Newsreader and Inter (SIL OFL 1.1)
+  # ship in fonts/ so every machine renders the same.
+  font: fonts/Newsreader-Regular.ttf
+  font_bold: fonts/Newsreader-SemiBold.ttf
+  font_italic: fonts/Newsreader-Italic.ttf
+  label_font: fonts/Inter-SemiBold.ttf
+  label_tracking: 1
+  text_color: "#EBE6DF"
+  accent_color: "#D3A445"
+  card_color: "#060605"
+  brand_name: Today In History
+  brand_tagline: Every date has a story.
+  time_kicker: On this day
   caption_size: 54
   tag_size: 30
   name_card_size: 34

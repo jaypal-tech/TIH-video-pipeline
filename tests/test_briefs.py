@@ -97,3 +97,20 @@ def test_cue_brief_adds_period_and_instrumental(bible):
     sfx = cue_brief(Cue(id="s1", kind="sfx", at=0, duration=1, prompt="glove creak"), bible)
     assert bible.style.sound_period in music and music.endswith("instrumental only")
     assert "instrumental" not in sfx and bible.style.sound_period in sfx
+
+
+def test_keyframe_brief_names_each_person_s_must_haves(plan, bible):
+    two = shot(plan, "1.6")
+    for prompts in (keyframe_brief(two, bible), keyframe_brief(two, bible, has_plate=True)):
+        for word, prompt in (("image", prompts["prompt_gemini"]), ("Figure", prompts["prompt_seedream"])):
+            for n, cid in enumerate(two.cast, start=1):
+                for item in bible.characters[cid].must:
+                    assert item in prompt
+            booth = two.cast.index("booth") + 1
+            assert f"from {word} {booth}: black mustache, black kid gloves." in prompt
+            assert prompt.index("black kid gloves") < prompt.index(bible.style.look[:30])
+
+
+def test_keyframe_brief_without_cast_has_no_must_haves(plan, bible):
+    prompt = keyframe_brief(shot(plan, "1.2"), bible)["prompt_gemini"]
+    assert "Keep for" not in prompt

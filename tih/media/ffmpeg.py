@@ -23,9 +23,15 @@ class Loudness:
     offset: float
 
 
-def run(args: list[str]) -> str:
+RUN_TIMEOUT_S = 1800  # a 90 s master with grain encodes in about 10 minutes; anything past this is stuck
+
+
+def run(args: list[str], timeout: float = RUN_TIMEOUT_S) -> str:
     """Run ffmpeg/ffprobe and return stderr (where ffmpeg writes its reports)."""
-    result = subprocess.run(args, capture_output=True, text=True)
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        raise FfmpegError(f"{args[0]} did not finish in {timeout:.0f} s") from error
     if result.returncode != 0:
         tail = "\n".join(result.stderr.strip().splitlines()[-15:])
         raise FfmpegError(f"{args[0]} failed:\n{tail}")
@@ -37,6 +43,7 @@ def probe(path: Path) -> dict:
         ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
         capture_output=True,
         text=True,
+        timeout=60,
     )
     if out.returncode != 0:
         raise FfmpegError(f"ffprobe could not read {path}: {out.stderr.strip()}")

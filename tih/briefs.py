@@ -71,6 +71,10 @@ def _keyframe_prompt(shot: ResolvedShot, bible: Bible, word: str, has_plate: boo
         else:
             keep = "keep their faces, hair and costumes exactly as in the references"
         parts.append(f"Using {who}, {keep}.")
+        for cid in shot.cast:
+            must = bible.characters[cid].must
+            if must:
+                parts.append(f"Keep for {labels[cid]}: {', '.join(must)}.")
     parts.append(_sentence(_describe(shot.keyframe, bible, labels)))
     if shot.scene is not None:
         if shot.cast:
@@ -80,7 +84,7 @@ def _keyframe_prompt(shot: ResolvedShot, bible: Bible, word: str, has_plate: boo
     if has_plate:
         plate = len(shot.cast) + 1
         parts.append(
-            f"Match the location, light direction and weather of {word} {plate}; change nothing about the place."
+            f"Match the location of {word} {plate}; change nothing about the place."
         )
     parts.append(_sentence(bible.style.look))
     if bible.style.clean:

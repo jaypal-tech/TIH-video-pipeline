@@ -330,7 +330,7 @@ def test_paid_stage_refuses_stale_shotplan(tmp_path):
     load_resolved(ctx)
     plan = plan_path(ctx.paths)
     data = yaml.safe_load(plan.read_text(encoding="utf-8"))
-    data["shots"][0]["duration"] = 3.0
+    data["shots"][0]["motion"] += ", rain heavier"  # any change; timing stays inside its clip
     plan.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     with pytest.raises(PlanError, match="re-run shotplan"):
         load_resolved(ctx)
@@ -393,11 +393,14 @@ def test_second_rehearsal_uses_new_plan(tmp_path):
     rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
     plan = plan_path(source.paths)
     data = yaml.safe_load(plan.read_text(encoding="utf-8"))
-    data["shots"][0]["duration"] = 3.0
+    # move half a second from shot 1.2 to shot 1.1; the clip (and its ambience bed) keeps its length
+    longer = data["shots"][0]["duration"] + 0.5
+    data["shots"][0]["duration"] = longer
+    data["shots"][1]["duration"] -= 0.5
     plan.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     ctx = rehearse_episode(1, "lincoln", root, source=tmp_path / "src")
     edl = yaml.safe_load((ctx.paths.scope_dir / "cut" / "edl.yaml").read_text(encoding="utf-8"))
-    assert edl[0]["duration"] == 3.0
+    assert edl[0]["duration"] == longer
 
 
 def test_slice_for_shot_boundaries():
@@ -451,3 +454,10 @@ def test_line_voiced_once_and_sliced_per_shot(tmp_path):
     start = {s.id: s.start_s for s in plan.shots}
     assert placed["4.2"] == start["4.2"]  # later pieces sit exactly on their own shot
     assert 0 <= start["4.1"] - placed["4.1"] <= 0.25  # a line's first piece may lead its shot (J-cut)
+
+
+def test_every_pipeline_step_is_used_by_a_stage():
+    pipeline = yaml.safe_load((ROOT / "series" / "lincoln" / "pipeline.yaml").read_text(encoding="utf-8"))
+    code = "".join(p.read_text(encoding="utf-8") for p in (ROOT / "tih").rglob("*.py"))
+    unused = [name for name in pipeline["steps"] if f'"{name}"' not in code]
+    assert unused == []

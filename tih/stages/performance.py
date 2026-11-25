@@ -64,6 +64,11 @@ def run_motion(ctx: RunContext) -> None:
     config = load_pipeline(ctx.paths.series).steps["motion"]
     gateway = gateway_for(ctx)
 
+    # every look is checked before anything is spent
+    for shot in plan.shots:
+        for character in shot.cast:
+            require_look(locks, character)
+
     sets: dict[str, TakeSet] = {}
     for shot in plan.shots:
         image_url = upload_local(gateway, Path(keyframes[shot.id].chosen))

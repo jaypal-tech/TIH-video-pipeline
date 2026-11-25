@@ -279,6 +279,17 @@ def resolve_plan(
                 f"script says {beat.line.text!r}"
             )
 
+    spans: dict[int, list[float]] = {}
+    for shot in resolved:
+        span = spans.setdefault(shot.clip, [shot.start_s, shot.start_s])
+        span[1] = round(shot.start_s + shot.duration, 3)
+    for cue in plan.cues:
+        if cue.kind == "ambience" and cue.scene in spans:
+            clip_start, clip_end = spans[cue.scene]
+            length = round(clip_end - clip_start, 3)
+            if abs(cue.at - clip_start) > 0.01 or abs(cue.duration - length) > 0.01:
+                errors.append(f"ambience {cue.id} must start at {clip_start} s and run {length} s (its clip)")
+
     runtime = round(start, 3)
     low, high = runtime_s
     if not low <= runtime <= high:

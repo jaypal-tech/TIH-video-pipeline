@@ -23,6 +23,8 @@ from tih.stages import camera as _camera  # noqa: F401  registers the stage
 from tih.stages import plates as _plates  # noqa: F401  registers the stage
 from tih.stages import record as _record  # noqa: F401  registers the stage
 from tih.stages import shotplan as _shotplan  # noqa: F401  registers the stage
+from tih.media.ffmpeg import FfmpegError
+from tih.stages import cut
 from tih.stages.cut import ambience_track, grade_filters, video_chain
 from tih.stages.performance import motion_elements
 from tih.stages.voice import dialogue_starts
@@ -81,7 +83,8 @@ def test_keyframe_brief_names_plate_image(episode_one):
     plan = resolve_plan(_plan_with(lambda p: None), episode_one, bible)
     one = next(s for s in plan.shots if s.id == "1.1")
     prompt = keyframe_brief(one, bible, has_plate=True)["prompt_gemini"]
-    assert "Match the location, light direction and weather of image 2" in prompt
+    assert "Match the location of image 2" in prompt
+    assert "light direction and weather of image" not in prompt  # each clip's scene rule sets those
     empty = next(s for s in plan.shots if s.id == "1.2")
     assert "image 1" in keyframe_brief(empty, bible, has_plate=True)["prompt_gemini"]
     assert "image" not in keyframe_brief(empty, bible)["prompt_gemini"]
@@ -255,3 +258,56 @@ def test_all_parts_conformed(tmp_path, monkeypatch):
             capture_output=True, text=True).stdout)["streams"][0]
         assert (probe["width"], probe["height"], probe["r_frame_rate"], probe["pix_fmt"]) == (1080, 1920, "24/1", "yuv420p"), part
         assert probe.get("sample_aspect_ratio", "1:1") == "1:1", part
+
+
+def test_empty_ambience_fails_instead_of_hanging(tmp_path):
+    empty = tmp_path / "empty.wav"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
+                    "-t", "0", str(empty)], check=True)
+    with pytest.raises(FfmpegError, match="too short to loop"):
+        ambience_track(empty, 10.0, tmp_path / "bed.wav")
+
+
+def test_ambience_must_span_its_clip(episode_one):
+    def late(plan):
+        bed = next(c for c in plan.cues if c.kind == "ambience" and c.scene == 2)
+        bed.at += 1.0
+
+    with pytest.raises(PlanError, match="ambience bed_2 must start at 13.0 s and run 14.0 s"):
+        resolve_plan(_plan_with(late), episode_one, load_bible("lincoln"))
+
+    def past_end(plan):
+        bed = next(c for c in plan.cues if c.kind == "ambience" and c.scene == 5)
+        bed.at, bed.duration = 80.0, 5.0
+
+    with pytest.raises(PlanError, match="ambience bed_5 must start at 53.0 s"):
+        resolve_plan(_plan_with(past_end), episode_one, load_bible("lincoln"))
+
+
+def test_motion_checks_every_look_before_spending(dry, tmp_path):
+    ctx, ledger = dry
+    plan = load_resolved(ctx)
+    cast = list(dict.fromkeys(c for s in plan.shots for c in s.cast))
+    looks = {c: _image(tmp_path / f"{c}.png") for c in cast}
+    plates = {p: _image(tmp_path / f"plate_{p}.png") for p in dict.fromkeys(s.place for s in plan.shots)}
+    save_locks("lincoln", Locks(
+        characters={c: CharacterLock(reference=str(i), reference_sha256=file_sha256(i)) for c, i in looks.items()},
+        places={p: PlaceLock(reference=str(i), reference_sha256=file_sha256(i)) for p, i in plates.items()},
+    ))
+    approve(ctx.paths, "look")
+    run_stage(ctx, "keyframes")
+    late = next(c for c in reversed(cast) if c not in plan.shots[0].cast)
+    looks[late].write_bytes(b"changed after the lock")
+    with pytest.raises(NotLocked, match=late):
+        run_stage(ctx, "motion")
+    assert [r for r in ledger.current() if r.step == "video"] == []
+
+
+def test_mix_pads_silence_only_to_the_runtime(monkeypatch, tmp_path):
+    # endless apad before atrim froze ffmpeg 9.1 in about 1 run in 8
+    seen = []
+    monkeypatch.setattr(cut.ffmpeg, "run", lambda args, **_: seen.append(args) or "")
+    cut._mix_inputs([(tmp_path / "a.wav", 0.0, None, 0.0), (tmp_path / "b.wav", 2.0, 1.0, -6.0)], 73.0,
+                    tmp_path / "bed.wav")
+    graph = seen[0][seen[0].index("-filter_complex") + 1]
+    assert "apad=whole_dur=73.000,atrim=0:73.000[out]" in graph

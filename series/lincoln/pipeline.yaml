@@ -61,16 +61,6 @@ steps:
           image_urls: "{image_urls}"
           image_size: portrait_16_9
 
-  keyframe_no_refs:
-    endpoint: google/nano-banana-2.1
-    estimate_usd: 0.15
-    takes: 2
-    arguments:
-      prompt: "{prompt_gemini}"
-      aspect_ratio: "9:16"
-      seed: "{seed}"
-      num_images: 1
-
   motion:
     endpoint: fal-ai/kling-video/v3/pro/image-to-video
     estimate_usd: 3.40 # the 15 s maximum at $0.112/s, doubled with elements, rounded up

@@ -3,7 +3,7 @@
 Paid. Each shot's prompt comes from tih.briefs: every attached reference is
 named by its image number, the shot is described before the style; the locked
 reference image of every character in the shot is attached, and the first
-character's locked seed is used. Shots with nobody in them use the text-only step.
+character's locked seed is used. Every shot also gets its place's locked plate, last.
 """
 
 from pathlib import Path
@@ -47,8 +47,7 @@ def run_keyframes(ctx: RunContext) -> None:
         character_locks = [require_look(locks, c) for c in shot.cast]
         references = [upload_local(gateway, Path(lock.reference)) for lock in character_locks]
         references.append(upload_local(gateway, Path(plates[shot.place].reference)))
-        step = "keyframe" if references else "keyframe_no_refs"
-        config = steps[step]
+        config = steps["keyframe"]
         base_seed = next((lock.seed for lock in character_locks if lock.seed is not None), None)
         takes = []
         for take in range(config.takes):

@@ -24,6 +24,7 @@ class Grade(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     eq: str = ""
+    balance: str = ""  # ffmpeg colorbalance settings, e.g. warm highlights toward the brand gold
     grain: int = 0
 
 
@@ -80,6 +81,15 @@ class OverlayStyle(BaseModel):
     name_card_size: int = 34
     card_size: int = 58
     caption_y: int = 1380
+    # brand: every default keeps plain white text on black, so a series opts in
+    label_font: str | None = None  # small uppercase labels: names, tags, kickers; falls back to font_bold
+    label_tracking: int = 0  # hair spaces between label letters, like the app's spaced labels
+    text_color: str = "white"
+    accent_color: str = "white"
+    card_color: str = "black"
+    brand_name: str = ""  # shown small in the corner, and under the closing card
+    brand_tagline: str = ""
+    time_kicker: str = ""  # a label above each time super, e.g. "On this day"
 
 
 class Bible(BaseModel):

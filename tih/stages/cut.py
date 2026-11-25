@@ -45,11 +45,14 @@ def _picture(ctx: RunContext, plan, work: Path) -> tuple[Path, list[dict]]:
     return picture, edl
 
 
+MIN_LOOP_SECONDS = 0.1
 AMBIENCE_FADE = 0.5  # seconds; each scene's bed fades in and runs this far into the next
 
 
 def grade_filters(grade: Grade) -> list[str]:
     filters = [f"eq={grade.eq}"] if grade.eq else []
+    if grade.balance:
+        filters.append(f"colorbalance={grade.balance}")
     if grade.grain > 0:
         filters.append(f"noise=alls={grade.grain}:allf=t")
     return filters
@@ -67,6 +70,13 @@ def video_chain(plan, bible: Bible, text_dir: Path) -> list[str]:
 
 def ambience_track(source: Path, length: float, target: Path) -> Path:
     """A scene's bed: the generated loop repeated to `length`, faded in and out."""
+    try:
+        loop_seconds = ffmpeg.duration(source)
+    except (ffmpeg.FfmpegError, KeyError, ValueError):
+        loop_seconds = 0.0
+    if loop_seconds < MIN_LOOP_SECONDS:
+        # looping an empty file never ends; stop with a reason instead
+        raise ffmpeg.FfmpegError(f"ambience {source.name} is too short to loop ({loop_seconds:.2f} s)")
     fade = min(AMBIENCE_FADE, length / 4)
     target.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg.run([
@@ -96,7 +106,7 @@ def _mix_inputs(inputs: list[tuple[Path, float, float | None, float]], runtime: 
         chains.append(f"[{index}:a]{','.join(steps)}[a{index}]")
         labels.append(f"[a{index}]")
     mix = (f"{''.join(labels)}amix=inputs={len(labels)}:normalize=0:duration=longest,"
-           f"apad,atrim=0:{runtime:.3f}[out]")
+           f"apad=whole_dur={runtime:.3f},atrim=0:{runtime:.3f}[out]")
     args += ["-filter_complex", ";".join(chains + [mix]), "-map", "[out]",
              "-ar", str(SAMPLE_RATE), str(target)]
     ffmpeg.run(args)
