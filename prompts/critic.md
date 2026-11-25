@@ -17,6 +17,8 @@ For each finding:
 
 Judge each check on its own. A plan that is strong in one way has not earned a pass in another.
 
+Judge every episode as a viewer who knows nothing of the story or its history. If its hook, turn and cliff would not tell that viewer who the episode follows, what they want and why they turn, the episode fails the checks about its hook, its change and its ending.
+
 Report every failure you find, including small ones. Sorting what matters is done after you.
 
 Episode titles come from the source and cannot change, so never report a finding about a title.

@@ -9,7 +9,9 @@ Go through every beat: the picture, the line, its evidence label, and any on-scr
 - **false_statement**: a line or card states something the source contradicts.
 - **false_implication**: a beat states nothing false, but its picture and words together lead a viewer to believe something the source does not support. Example: a line about weapons placed next to an object a viewer will assume is a weapon. This is the most common problem, so look for it closely.
 - **lost_label**: something only some accounts support is shown as settled, or a reported line has lost its label.
-- **unsupported**: a dramatized line or a picture adds a fact (an event, motive, date, relationship or knowledge) the source does not support.
+- **unsupported**: a dramatized line, a narration line or a picture adds a fact (an event, motive, date, relationship or knowledge) the source does not support.
+
+A narration line is the series itself stating fact (`delivery: narration`). Check every claim in it against the source, word by word: a viewer takes it as true. Anything in it that only some accounts support needs to say so in its own words, or it is a `lost_label`.
 
 Questions the source leaves open must stay open. A script that settles one, even by implication, is a finding.
 

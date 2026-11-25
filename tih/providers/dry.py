@@ -2,7 +2,8 @@
 
 `tih rehearse` runs a whole episode through every stage with this transport:
 stills are flat colour frames labelled with their prompt, videos hold the
-still, speech is a tone as long as the line, transcripts echo the line. The
+still (a scene take is a flat colour per shot, cut at its planned times), speech
+is a tone as long as the line, transcripts echo the line. The
 ledger still prices every call from models.yaml, so a rehearsal tells you
 what the real run should cost, and the final cut shows timing, captions and
 cards exactly as they will be.
@@ -12,11 +13,16 @@ import hashlib
 import json
 import re
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any
 
+from tih.briefs import SHOT_HEADER, SPOKEN
+from tih.media.ffmpeg import extract_audio
+
 PAUSE_TAG = re.compile(r"<#[0-9.]+#>")
 SECONDS_PER_WORD = 0.38
+SHOT_COLOURS = ("0x303a4a", "0xd0d0c0", "0x101820", "0x909aa0")  # far apart, so every planned cut is a real one
 
 
 def _ffmpeg(args: list[str]) -> None:
@@ -56,6 +62,8 @@ class DryRunTransport:
         saved = json.loads(self.uploads_file.read_text()) if self.uploads_file.exists() else {}
         self.uploads: dict[str, Path] = {url: Path(path) for url, path in saved.items()}
         self.spoken: dict[str, str] = {}
+        self.lengths: dict[str, float] = {}  # seconds of each scene take's sound, by hash
+        self._lock = threading.Lock()  # stages may call from several threads at once
 
     def submit(self, endpoint: str, arguments: dict[str, Any]) -> str:
         digest = hashlib.sha256(
@@ -76,9 +84,13 @@ class DryRunTransport:
         if kind == "transcript":
             source = self.uploads.get(str(arguments.get("audio_url")))
             text = self.spoken.get(_sha(source), "") if source else ""
+            length = self.lengths.get(_sha(source)) if source else None
+            step = SECONDS_PER_WORD
+            if length and len(text.split()) * step > length:
+                step = length / len(text.split())  # spread the words evenly inside the take
             timed = [
-                {"text": word, "start": round(i * SECONDS_PER_WORD, 3),
-                 "end": round((i + 1) * SECONDS_PER_WORD - 0.05, 3), "type": "word"}
+                {"text": word, "start": round(i * step, 3),
+                 "end": round((i + 1) * step - 0.05, 3), "type": "word"}
                 for i, word in enumerate(text.split())
             ]
             return {"text": text, "words": timed}
@@ -99,6 +111,12 @@ class DryRunTransport:
             video = self.uploads[str(arguments["video_url"])]
             url = self._url(request_id, ".mp4", {"kind": "copy", "source": str(video)})
             return {"video": {"url": url}}
+        if kind == "video" and not ({"image_url", "start_image_url"} & arguments.keys()):
+            seconds = float(str(arguments.get("duration", "5")).rstrip("s"))
+            text = " ".join(SPOKEN.findall(str(arguments.get("prompt", ""))))
+            cuts = [float(start) for start, _ in SHOT_HEADER.findall(str(arguments.get("prompt", "")))][1:]
+            url = self._url(request_id, ".mp4", {"kind": "scene", "seconds": seconds, "text": text, "cuts": cuts})
+            return {"video": {"url": url}}
         if kind == "video":
             image = self.uploads[str(arguments.get("start_image_url", arguments.get("image_url")))]
             seconds = float(str(arguments.get("duration", "5")).rstrip("s"))
@@ -114,15 +132,31 @@ class DryRunTransport:
         out = str(destination)
         if kind == "still":
             colour = "0x" + hashlib.sha256(spec["label"].encode()).hexdigest()[:6]
-            label_file = self.workdir / f"{hashlib.sha256(spec['label'].encode()).hexdigest()[:12]}.txt"
+            label_file = destination.with_suffix(".label.txt")  # one per download, never shared
             label_file.write_text(spec["label"], encoding="utf-8")
             _ffmpeg(["-f", "lavfi", "-i", f"color=c={colour}:s=720x1280", "-frames:v", "1",
                      "-vf", f"drawtext=textfile={label_file}:fontcolor=white:fontsize=28:x=20:y=60",
                      "-f", "image2", "-c:v", "png", out])
+            label_file.unlink()
         elif kind == "hold":
             _ffmpeg(["-loop", "1", "-i", spec["source"], "-t", f"{spec['seconds']}", "-r", "24",
                      "-vf", "format=yuv420p", "-c:v", "libx264", "-preset", "ultrafast",
                      "-f", "mp4", out])
+        elif kind == "scene":
+            # A pitch per spoken text keeps scenes of equal length from sharing one transcript.
+            pitch = 180 + int(hashlib.sha256(spec["text"].encode()).hexdigest()[:4], 16) % 400
+            # a new flat colour at each planned cut, so the stage finds the cuts it would find in a real clip
+            shots = ["null", *(
+                f"drawbox=w=iw:h=ih:t=fill:color={SHOT_COLOURS[number % len(SHOT_COLOURS)]}:enable='gte(t,{at})'"
+                for number, at in enumerate(spec["cuts"], start=1))]
+            _ffmpeg(["-f", "lavfi", "-i", f"color=c={SHOT_COLOURS[0]}:s=720x1280:r=24:d={spec['seconds']}",
+                     "-f", "lavfi", "-i", f"sine=frequency={pitch}:duration={spec['seconds']}",
+                     "-vf", ",".join(shots), "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                     "-c:a", "aac", "-shortest", "-f", "mp4", out])
+            sound = _sha(extract_audio(Path(out), Path(out).with_suffix(".dry.wav")))
+            Path(out).with_suffix(".dry.wav").unlink()
+            self.spoken[sound] = spec["text"]
+            self.lengths[sound] = spec["seconds"]
         elif kind == "copy":
             Path(out).write_bytes(Path(spec["source"]).read_bytes())
         elif kind == "tone":
@@ -137,8 +171,9 @@ class DryRunTransport:
 
     def upload(self, path: Path) -> str:
         url = f"https://dry.run/upload/{_sha(Path(path))}"
-        self.uploads[url] = Path(path)
-        self.uploads_file.write_text(
-            json.dumps({key: str(value) for key, value in self.uploads.items()}, indent=2)
-        )
+        with self._lock:
+            self.uploads[url] = Path(path)
+            self.uploads_file.write_text(
+                json.dumps({key: str(value) for key, value in self.uploads.items()}, indent=2)
+            )
         return url

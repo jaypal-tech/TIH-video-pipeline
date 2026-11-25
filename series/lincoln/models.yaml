@@ -23,6 +23,9 @@ endpoints:
     tier_key: generate_audio # voice control ($0.196/s) is not used
     rates: { "false": 0.112, "true": 0.168 }
     elements_multiplier: 2.0 # binding characters as elements doubles the per-second rate
+  bytedance/seedance-2.0/text-to-video: # rates checked 2026-11-25; 720p with audio
+    unit: seconds
+    rate: 0.3034
   minimax/h3-max/image-to-video:
     unit: seconds
     tier_key: resolution

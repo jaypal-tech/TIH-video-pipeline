@@ -9,6 +9,8 @@ characters:
     reference_sha256: d2257674c14457be7d65eee83268e59e11c38849e6a4bde22c308f2b57a3ee7f
     seed: 1866
     voice_id: iP95p4xoKVk53GoZ742B
+  narrator:
+    voice_id: pqHfZKP75CvOlQylNhV4
   powell:
     reference: series/lincoln/assets/characters/powell/identity.png
     reference_sha256: 0ac691f755c0a29f01ccc15c61efdba6d5ec0e2d0924e85df40a31aa237f67da

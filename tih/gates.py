@@ -38,7 +38,7 @@ def gate_artifacts(paths: RunPaths, gate: str) -> list[Path]:
             plan_path(paths),
         ]
     if gate == "picture":
-        return [paths.scope_dir / "cut" / "final.mp4"]
+        return [paths.scope_dir / "cut_seedance" / "final.mp4"]  # the only flow built so far
     raise KeyError(f"Unknown gate '{gate}'. Available: {', '.join(GATE_NAMES)}")
 
 

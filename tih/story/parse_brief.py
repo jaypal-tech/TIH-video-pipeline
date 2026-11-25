@@ -193,6 +193,7 @@ def extract_canon(episodes: list[Episode], sources: dict[str, Any]) -> Canon:
                         groups["true_cards"].append(overlay.text)
                     if overlay.kind == "name_card":
                         groups["name_cards"].append(overlay.text)
+    groups["real_words"] += sources.get("extra_real_words", [])
     groups = {name: list(dict.fromkeys(items)) for name, items in groups.items()}
 
     provenance = {}

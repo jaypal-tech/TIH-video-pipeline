@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from tih.series import CraftTargets, SeriesConfig
-from tih.story.models import Beat, Canon, Episode, Evidence, Line
+from tih.story.models import NARRATOR, Beat, Canon, Delivery, Episode, Evidence, Line
 from tih.story.season import Violation
 
 PROTECTED = (Evidence.real_words, Evidence.reported)
@@ -95,6 +95,16 @@ def check_script(
     for beat in beats:
         if not beat.line:
             continue
+        narration = (beat.line.speaker == NARRATOR, beat.line.delivery == Delivery.narration,
+                     beat.line.evidence == Evidence.narration)
+        if any(narration) and not all(narration):
+            found.append(
+                Violation(
+                    "narration",
+                    f"Beat {beat.id}: a narration line has speaker {NARRATOR}, delivery narration "
+                    f"and evidence narration, all three.",
+                )
+            )
         if beat.line.evidence not in PROTECTED and beat.line.text in canon_lines:
             found.append(
                 Violation(
@@ -136,12 +146,13 @@ def pace_report(script: Episode, story: EpisodeStory) -> PaceReport:
     """Measure the script against short-drama pace. Information only."""
     lines = [beat for beat in _beats(script) if beat.line]
     words = [len(beat.line.text.split()) for beat in lines]
+    spoken = [len(beat.line.text.split()) for beat in lines if beat.line.delivery != Delivery.narration]
     talk = sum(words) / WORDS_PER_SECOND / script.runtime_s if script.runtime_s else 0
     starts = [0.0] + [beat.start_s for beat in lines] + [float(script.runtime_s)]
     return PaceReport(
         turns=len(story.turns),
         talk_share=round(talk, 2),
-        words_per_line=round(sum(words) / len(words), 1) if words else 0,
+        words_per_line=round(sum(spoken) / len(spoken), 1) if spoken else 0,  # character lines; narration runs longer
         places=len({clip.place.split("·")[0].strip() for clip in script.clips}),
         longest_silence_s=max(b - a for a, b in zip(starts, starts[1:])),
     )

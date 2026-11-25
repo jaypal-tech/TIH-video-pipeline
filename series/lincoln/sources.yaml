@@ -7,6 +7,11 @@ sources:
   eckert_1867: "Thomas Eckert, testifying in 1867 to what Powell told him (third-hand)"
   brief_extra_facts: "Producer brief, extra facts list, rated High, no citation given"
 
+# Real words from a listed source that the brief's draft scripts do not use; the writer may use them too.
+extra_real_words:
+  - "It is also unsatisfactory to some that the elective franchise is not given to the colored man."
+  - "I would myself prefer that it were now conferred on the very intelligent, and on those who serve our cause as soldiers."
+
 claims:
   # REAL WORDS
   "We meet this evening, not in sorrow, but in gladness of heart.":
@@ -16,6 +21,13 @@ claims:
     source_id: basler_last_address
     confidence: high
   "and on those who serve our cause as soldiers.":
+    source_id: basler_last_address
+    confidence: high
+  # checked against the Basler text of the address; it names what "it" is in the next sentence
+  "It is also unsatisfactory to some that the elective franchise is not given to the colored man.":
+    source_id: basler_last_address
+    confidence: high
+  "I would myself prefer that it were now conferred on the very intelligent, and on those who serve our cause as soldiers.":
     source_id: basler_last_address
     confidence: high
   "Don't wish to disturb you. Are you at home?":

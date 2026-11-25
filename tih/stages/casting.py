@@ -1,4 +1,4 @@
-"""Stage: casting. Candidate reference sheets and voices for this episode's cast.
+"""Stage: casting. Candidate reference sheets and voices for this episode's cast and its narrator.
 
 Paid. Only characters that are not locked yet are cast, so a character cast
 in episode 1 costs nothing in episode 2. The owner listens and looks, then
@@ -7,8 +7,8 @@ what every later shot uses.
 """
 
 from tih.assets import ShotRef
-from tih.bible import character_text, load_bible, load_locks
-from tih.briefs import voice_design_brief, voice_preview
+from tih.bible import NARRATOR_ID, character_text, load_bible, load_locks
+from tih.briefs import narrator_voice_brief, voice_design_brief, voice_preview
 from tih.gates import require_approved
 from tih.production import (
     TakeSet,
@@ -43,11 +43,13 @@ def run_casting(ctx: RunContext) -> None:
     gateway = gateway_for(ctx)
 
     on_screen = sorted({c for shot in plan.shots for c in shot.cast})
-    speakers = sorted({shot.speaker for shot in plan.shots if shot.speaker})
     lines: dict[str, list[str]] = {}
+    if plan.opening is not None and plan.opening.line:
+        lines[NARRATOR_ID] = [plan.opening.line]
     for shot in plan.shots:
         if shot.speaker:
             lines.setdefault(shot.speaker, []).append(shot.line)
+    speakers = sorted(lines)
 
     sets: dict[str, TakeSet] = {}
     for character_id in on_screen:
@@ -85,7 +87,8 @@ def run_casting(ctx: RunContext) -> None:
                 config,
                 "voice_design",
                 {
-                    "voice_description": voice_design_brief(bible.characters[character_id]),
+                    "voice_description": narrator_voice_brief(bible.narrator) if character_id == NARRATOR_ID
+                    else voice_design_brief(bible.characters[character_id]),
                     "preview_text": voice_preview(lines[character_id]),
                     "voice_name": f"{series} {character_id} take {take + 1}",
                 },

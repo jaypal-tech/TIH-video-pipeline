@@ -6,6 +6,7 @@ import typer
 
 from tih.bible import (
     LOCKS_OVERRIDE,
+    NARRATOR_ID,
     CharacterLock,
     PlaceLock,
     file_sha256,
@@ -22,15 +23,18 @@ from tih.probe import probe_estimate, run_probe
 from tih.production import read_takes, save_pick
 from tih.providers.dry import DryRunTransport
 from tih.providers.fal import GatewayContext
+from tih.scenes import Flow
 from tih.stages import camera as _camera  # noqa: F401  registers the stage
 from tih.stages import casting as _casting  # noqa: F401  registers the stage
 from tih.stages import cut as _cut  # noqa: F401  registers the stage
 from tih.stages import director as _director  # noqa: F401  registers the stage
 from tih.stages import historians_desk as _historians_desk  # noqa: F401  registers the stage
 from tih.stages import lipsync as _lipsync  # noqa: F401  registers the stage
+from tih.stages import narration as _narration  # noqa: F401  registers the stage
 from tih.stages import performance as _performance  # noqa: F401  registers the stage
 from tih.stages import plates as _plates  # noqa: F401  registers the stage
 from tih.stages import record as _record  # noqa: F401  registers the stage
+from tih.stages import scenes as _scenes  # noqa: F401  registers the stage
 from tih.stages import shotplan as _shotplan  # noqa: F401  registers the stage
 from tih.stages import sound as _sound  # noqa: F401  registers the stage
 from tih.stages import story_room as _story_room  # noqa: F401  registers the stage
@@ -38,8 +42,10 @@ from tih.stages import voice as _voice  # noqa: F401  registers the stage
 from tih.stages import writers_room as _writers_room  # noqa: F401  registers the stage
 from tih.stages.registry import DONE_FILE, RunContext, run_stage
 
-# The order an episode runs in after Script Lock and Look Lock.
-EPISODE_STAGES = ("director", "shotplan", "keyframes", "motion", "voice", "lipsync", "sound", "cut")
+# The order an episode runs in after Script Lock and Look Lock, per flow. Only Seedance is built.
+FLOW_STAGES: dict[str, tuple[str, ...]] = {
+    flow: ("director", "shotplan", "narration", f"scenes_{flow}", "sound", f"cut_{flow}") for flow in ("seedance",)
+}
 
 app = typer.Typer(no_args_is_help=True)
 lock_app = typer.Typer(no_args_is_help=True, help="Lock a character's look or voice.")
@@ -49,6 +55,15 @@ app.add_typer(lock_app, name="lock")
 @app.callback()
 def main() -> None:
     """Run the story pipeline."""
+
+
+def flow_stages(flow: str) -> tuple[str, ...]:
+    """The stages of one flow, or a clear refusal before anything runs."""
+    if flow == "veo":
+        raise typer.BadParameter("the veo flow is not built yet")
+    if flow not in FLOW_STAGES:
+        raise typer.BadParameter(f"--flow must be one of {', '.join(FLOW_STAGES)}")
+    return FLOW_STAGES[flow]
 
 
 def _context(episode: str, series: str, root: Path) -> RunContext:
@@ -76,25 +91,38 @@ def run(
 def episode(
     number: int,
     series: str = typer.Option(..., "--series"),
+    flow: str = typer.Option(..., "--flow", help="How scenes are made: seedance (veo is not built yet)."),
     start: str = typer.Option("director", "--from", help="First stage to run."),
     force: bool = typer.Option(False, "--force", help="Re-run stages from --from on."),
     root: Path = typer.Option(Path("runs"), "--root"),
 ) -> None:
     """Run an episode end to end. Takes made before are reused at no cost."""
-    if start not in EPISODE_STAGES:
-        raise typer.BadParameter(f"--from must be one of {', '.join(EPISODE_STAGES)}")
+    stages = flow_stages(flow)
+    if start not in stages:
+        raise typer.BadParameter(f"--from must be one of {', '.join(stages)}")
     ctx = _context(str(number), series, root)
-    for stage in EPISODE_STAGES[EPISODE_STAGES.index(start):]:
+    for stage in stages[stages.index(start):]:
         result = run_stage(ctx, stage, force=force)
         typer.echo(f"{stage}: {result}")
 
 
-def rehearse_episode(number: int, series: str, root: Path, source: Path = Path("runs")) -> RunContext:
-    """Run every video stage with placeholder media, from the real locked script and shot plan.
+def rehearse_episode(
+    number: int, series: str, root: Path, source: Path = Path("runs"), flow: Flow = "seedance"
+) -> RunContext:
+    """Run every video stage of a flow with placeholder media, from the real locked script and shot plan.
 
     The Writer's script and the Director's plan are copied from `source`; locks and
     approvals stay inside `root`.
     """
+    stages = flow_stages(flow)
+    ctx = prepare_rehearsal(number, series, root, source)
+    for stage in stages[2:]:
+        run_stage(ctx, stage, force=True)
+    return ctx
+
+
+def prepare_rehearsal(number: int, series: str, root: Path, source: Path = Path("runs")) -> RunContext:
+    """A rehearsal up to its paid video stages: script and plan copied in, approved, cast and plates locked."""
     paths = RunPaths(series, number, root=root)
     real = RunPaths(series, number, root=source)
     for stage in ("writers_room", "director"):
@@ -132,8 +160,6 @@ def rehearse_episode(number: int, series: str, root: Path, source: Path = Path("
         locks.places[key.split(":")[1]] = PlaceLock(reference=first.path, reference_sha256=file_sha256(Path(first.path)))
     save_locks(series, locks)
     approve_gate(paths, "look")
-    for stage in EPISODE_STAGES[2:]:
-        run_stage(ctx, stage, force=True)
     return ctx
 
 
@@ -141,14 +167,15 @@ def rehearse_episode(number: int, series: str, root: Path, source: Path = Path("
 def rehearse(
     number: int,
     series: str = typer.Option(..., "--series"),
+    flow: str = typer.Option("seedance", "--flow", help="How scenes are made: seedance (veo is not built yet)."),
     root: Path = typer.Option(Path("runs-dry"), "--root"),
 ) -> None:
     """Run an episode end to end with placeholder media: $0, real timing and text."""
-    ctx = rehearse_episode(number, series, root)
+    ctx = rehearse_episode(number, series, root, flow=flow)
     ledger = Ledger(root / series / "calls.jsonl")
     calls = ledger.current()
     priced = sum(r.cost_usd or 0.0 for r in calls)
-    final = ctx.paths.scope_dir / "cut" / "final.mp4"
+    final = ctx.paths.scope_dir / f"cut_{flow}" / "final.mp4"
     typer.echo(f"Rehearsal cut: {final}")
     typer.echo(f"{len(calls)} calls; a real run would cost about ${priced:.2f} at models.yaml prices")
 
@@ -177,11 +204,13 @@ def pick(
     series: str = typer.Option(..., "--series"),
     root: Path = typer.Option(Path("runs"), "--root"),
 ) -> None:
-    """Choose a different take for one shot, e.g. tih pick 1 keyframes 2.3 1."""
+    """Choose a different take for one shot or take, e.g. tih pick 1 scenes_seedance 2.1 1."""
     ctx = RunContext(paths=RunPaths(series, episode, root=root))
     save_pick(ctx, stage, shot, take)
-    typer.echo(f"Picked take {take} for {stage} {shot}. Re-run: "
-               f"tih episode {episode} --series {series} --from {stage} --force")
+    flow = next((name for name, stages in FLOW_STAGES.items() if stage in stages), None)
+    rerun = (f"tih episode {episode} --series {series} --flow {flow} --from {stage} --force" if flow
+             else f"tih run {episode} --stage {stage} --series {series} --force")
+    typer.echo(f"Picked take {take} for {stage} {shot}. Re-run: {rerun}")
 
 
 def _mark_kept(series: str, root: Path, output: Path) -> None:
@@ -243,9 +272,11 @@ def lock_voice(
     endpoint: str | None = typer.Option(None, "--endpoint"),
     series: str = typer.Option(..., "--series"),
 ) -> None:
-    """Lock a character's voice id for every future line."""
+    """Lock a character's voice id for every future line; `narrator` locks the narrator's."""
     bible = load_bible(series)
-    if character not in bible.characters or not bible.characters[character].voice:
+    speaks = bible.narrator is not None if character == NARRATOR_ID else (
+        character in bible.characters and bible.characters[character].voice)
+    if not speaks:
         raise typer.BadParameter(f"{character} is not a speaking character in the bible")
     locks = load_locks(series)
     lock = locks.characters.get(character, CharacterLock())

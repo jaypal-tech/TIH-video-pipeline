@@ -11,6 +11,7 @@ style:
     composition, gaslight amber and moon-blue palette, light haze, wet-plate
     collodion vignette, fine 35mm film grain, muted color with red bunting as
     the only saturated color, shallow depth of field, natural skin texture
+  scene_look: "photorealistic period drama set in 1865, 35mm film, shallow depth of field, fine film grain, low-key lighting, real-time speed, no zoom, no slow motion, no text, no captions, no subtitles, no 3D, no cartoon - photorealistic textures, real skin pores, authentic period fabric. Wholly original, invented faces."
   negative: >-
     modern clothing, modern buildings, electric light, wristwatch, zipper,
     readable text, letters, signs, captions, watermark, logo, extra fingers,
@@ -45,6 +46,9 @@ characters:
     name: John Wilkes Booth
     name_card: "JOHN WILKES BOOTH · America's matinee idol · 26"
     episodes: [1, 2, 3, 4, 5]
+    screen_name: "THE ACTOR"
+    scene_look: "a 26-year-old man, jet-black curly hair to the collar, long sideburns, a thick black handlebar moustache with upturned ends, dark eyes under heavy brows, pale handsome face, a black flat-crowned wide-brimmed hat, a white high collar with a black silk cravat, a dark wool frock coat with a dark velvet collar, dark leather gloves"
+    scene_voice: "a smooth, controlled, educated American baritone, almost a whisper"
     look: >-
       26-year-old man, 5'8" athletic build, pale skin, dark intense eyes,
       jet-black curly hair, neat black mustache, black broadcloth frock coat,
@@ -58,6 +62,9 @@ characters:
     name: Lewis Powell
     name_card: "LEWIS POWELL · Confederate veteran · 20"
     episodes: [1, 5]
+    screen_name: "THE SOLDIER"
+    scene_look: "a 20-year-old man, very tall and broad-shouldered, a clean-shaven ruddy boyish face with a square jaw, short brown hair, a flat unblinking stare, a grey wool forage cap with a short black leather visor, a plain dark wool sack coat buttoned over a collarless grey shirt"
+    scene_voice: "a slow, deep, flat Southern drawl, barely above a murmur"
     look: >-
       20-year-old man, 6'2", very broad heavy shoulders, heavy square jaw,
       thick dark hair, flat unblinking stare, worn dark wool coat too tight
@@ -67,6 +74,10 @@ characters:
     name: Abraham Lincoln
     name_card: "ABRAHAM LINCOLN · President · 56"
     episodes: [1, 2]
+    face_reference: false
+    screen_name: "THE PRESIDENT"
+    scene_look: "a 56-year-old man, very tall and gaunt, a deeply lined hollow-cheeked face, a dark chin beard with no moustache, dark tousled hair, a black frock coat, a white shirt and a black bow tie"
+    scene_voice: "a high, clear, reedy tenor with a Kentucky accent, slow and deliberate, pitched to carry over a silent crowd"
     look: >-
       man aged 56, 6'4", very tall and gaunt, deeply lined hollow-cheeked face,
       coarse black hair, chin beard and no mustache, grey eyes, loose rumpled
@@ -79,6 +90,9 @@ characters:
     name: Tad Lincoln
     name_card: "TAD LINCOLN · his son · 12"
     episodes: [1]
+    face_reference: false
+    screen_name: "THE BOY"
+    scene_look: "a 12-year-old boy with dark hair, a small dark wool jacket and a white collar"
     look: 12-year-old boy, small for his age, tousled hair, dark boy's jacket
     voice: null # silent
   grant:
@@ -172,6 +186,12 @@ characters:
       jacket, checked trousers, a pocket watch
     voice: null # silent in ep 5
 
+# The narrator sets up and closes each episode and is never seen. The voice is
+# designed once in casting and locked like a character's: tih lock voice narrator.
+narrator:
+  voice: "a calm, low, unhurried American male storyteller in his fifties, warm and grave, close to the microphone, no theatrical emphasis"
+  tempo: 1.15 # the stock voice reads slowly; played a little faster, each line stays inside its shot
+
 places:
   L1:
     name: White House north lawn, the crowd
@@ -180,12 +200,22 @@ places:
       umbrellas and torches, torch-amber light on faces, moon-blue rain, the
       White House north front dark behind except one lit window above the
       portico
+    scene_look: "an open lawn at night in April 1865, steady drizzle, seen from behind a dense crowd that faces a white columned mansion. Men in dark felt hats and dark wool coats stand with their backs to the camera, black umbrellas, hand-held burning pine torches, wet mud underfoot. Every one of them faces the mansion and looks up at one lit window above its portico. Amber torchlight on hats and shoulders; cold blue-black night above."
+  L1R:
+    name: North lawn, facing the crowd
+    plate: false
+    look: >-
+      the same White House north lawn seen from the mansion side, the camera
+      facing a dense night crowd with torches and umbrellas, torch-amber light
+      on faces, moon-blue rain, no building in frame
+    scene_look: "inside a dense crowd on an open lawn at night in April 1865, steady drizzle. Men in dark felt hats and dark wool coats press in on every side, black umbrellas overhead, hand-held burning pine torches, wet mud underfoot; behind them only more hats and umbrellas fading into black night and rain. Amber torchlight falls on the left side of faces; the right side falls into cold blue-black night. Everyone faces the camera and looks up past it at something high above and behind the camera."
   L2:
     name: The window above the north portico
     look: >-
       the window above the White House north portico, seen from slightly below
       and outside, one candle held by a hand from frame left, loose manuscript
       pages, warm candlelight against night rain
+    scene_look: "a tall open second-floor sash window of a white mansion at night in April 1865, seen from just outside, drizzle falling past the frame. The room behind is dark wood and shadow, lit only by one candle. Warm candlelight on the face, cold blue night at the edges of the frame."
   L3:
     name: The President's office, White House
     look: >-

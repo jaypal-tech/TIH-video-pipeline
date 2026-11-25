@@ -3,6 +3,7 @@ import fcntl
 import hashlib
 import json
 import os
+import threading
 from pathlib import Path
 from typing import Any, Literal
 
@@ -79,25 +80,32 @@ def _redact(value: Any, secrets: list[str]) -> Any:
 
 
 class Ledger:
-    """Append-only JSONL record of every provider call."""
+    """Append-only JSONL record of every provider call.
+
+    Safe to share between threads: a check and the line it leads to are written
+    under one lock, and the file lock keeps other processes' lines whole.
+    """
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
+        self._lock = threading.RLock()
 
     def append(self, record: CallRecord) -> None:
-        if any(existing.call_id == record.call_id for existing in self.current()):
-            raise ValueError(f"Duplicate call_id: {record.call_id}")
-        self._write({"event": "call", "record": record.model_dump()})
+        with self._lock:
+            if any(existing.call_id == record.call_id for existing in self.current()):
+                raise ValueError(f"Duplicate call_id: {record.call_id}")
+            self._write({"event": "call", "record": record.model_dump()})
 
     def update(self, call_id: str, **fields: Any) -> None:
         unknown = set(fields) - set(CallRecord.model_fields)
         if unknown:
             raise ValueError(f"Unknown fields: {', '.join(sorted(unknown))}")
-        current = {record.call_id: record for record in self.current()}
-        if call_id not in current:
-            raise KeyError(f"Unknown call_id: {call_id}")
-        CallRecord.model_validate({**current[call_id].model_dump(), **fields})
-        self._write({"event": "update", "call_id": call_id, "fields": fields})
+        with self._lock:
+            current = {record.call_id: record for record in self.current()}
+            if call_id not in current:
+                raise KeyError(f"Unknown call_id: {call_id}")
+            CallRecord.model_validate({**current[call_id].model_dump(), **fields})
+            self._write({"event": "update", "call_id": call_id, "fields": fields})
 
     def current(self) -> list[CallRecord]:
         records: dict[str, dict[str, Any]] = {}

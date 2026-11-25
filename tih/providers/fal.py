@@ -3,6 +3,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field, replace
@@ -127,6 +128,15 @@ class GatewayContext:
     budget: BudgetGuard
     transport: Transport
     models_file: Path
+    # Stages may share one gateway between threads: `lock` guards uploads.json
+    # and the per-fingerprint locks, and one fingerprint's call runs only once at
+    # a time, so a second asker reuses the first's call as a sequential run would.
+    lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+    _calls: dict[str, threading.Lock] = field(default_factory=dict, repr=False, compare=False)
+
+    def call_lock(self, call_fingerprint: str) -> threading.Lock:
+        with self.lock:
+            return self._calls.setdefault(call_fingerprint, threading.Lock())
 
     @classmethod
     def for_run(cls, paths: RunPaths) -> "GatewayContext":
@@ -140,13 +150,20 @@ class GatewayContext:
 def upload_local(ctx: GatewayContext, path: Path) -> str:
     """Upload a local file once and reuse its URL, so call fingerprints stay stable."""
     cache_file = ctx.paths.root / ctx.paths.series / "uploads.json"
-    cache = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file.exists() else {}
     digest = _sha256(Path(path))
-    if digest not in cache:
-        cache[digest] = ctx.transport.upload(Path(path))
+    with ctx.lock:
+        cache = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file.exists() else {}
+    if digest in cache:
+        return cache[digest]
+    url = ctx.transport.upload(Path(path))  # outside the lock: other threads keep working
+    with ctx.lock:  # read again, so another thread's new entry is kept
+        cache = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file.exists() else {}
+        url = cache.setdefault(digest, url)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(json.dumps(cache, indent=2), encoding="utf-8")
-    return cache[digest]
+        temp = cache_file.with_name(f"{cache_file.name}.{uuid.uuid4().hex}.tmp")
+        temp.write_text(json.dumps(cache, indent=2), encoding="utf-8")
+        os.replace(temp, cache_file)  # whole or not at all, even if the run is stopped
+    return url
 
 
 @dataclass
@@ -235,6 +252,25 @@ def _record_failure(
 
 
 def _attempt(
+    ctx: GatewayContext,
+    step: str,
+    endpoint: str,
+    arguments: dict[str, Any],
+    shot_ref: ShotRef,
+    estimate_usd: float,
+    take: int,
+    quantity: float | None,
+    expects_files: bool,
+) -> GenerationResult:
+    prompt, settings, _, input_hashes = _split_arguments(arguments)
+    call_fingerprint = fingerprint(endpoint, {**settings, "take": take}, prompt, input_hashes)
+    with ctx.call_lock(call_fingerprint):
+        return _attempt_unlocked(
+            ctx, step, endpoint, arguments, shot_ref, estimate_usd, take, quantity, expects_files
+        )
+
+
+def _attempt_unlocked(
     ctx: GatewayContext,
     step: str,
     endpoint: str,

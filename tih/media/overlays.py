@@ -12,6 +12,7 @@ from pathlib import Path
 
 from tih.bible import OverlayStyle
 from tih.media.ffmpeg import HEIGHT, WIDTH, escape_path
+from tih.scenes import Caption
 from tih.shots import ResolvedPlan
 from tih.story.models import Delivery
 
@@ -61,8 +62,9 @@ def _lines_centered(
     ]
 
 
-def layout(plan: ResolvedPlan, style: OverlayStyle) -> list[Text]:
-    """Place every caption, tag, card and super for the episode."""
+def layout(plan: ResolvedPlan, style: OverlayStyle, captions: list[Caption] | None = None) -> list[Text]:
+    """Place every caption, tag, card and super for the episode. Given caption
+    pages, they are drawn instead of each shot's whole line."""
     texts: list[Text] = []
     label_font = style.label_font or style.font_bold
     tracking = style.label_tracking
@@ -73,9 +75,10 @@ def layout(plan: ResolvedPlan, style: OverlayStyle) -> list[Text]:
     for shot in plan.shots:
         start, end = shot.start_s, shot.start_s + shot.duration
         if shot.line:
-            font = style.font_italic if shot.delivery == Delivery.inner else style.font
-            texts += _lines_centered(shot.line, start, end, style.caption_y, style.caption_size, font, 30,
-                                     color=style.text_color)
+            if captions is None:
+                font = style.font_italic if shot.delivery == Delivery.inner else style.font
+                texts += _lines_centered(shot.line, start, end, style.caption_y, style.caption_size, font, 30,
+                                         color=style.text_color)
             if shot.evidence_label:
                 texts.append(
                     Text(label(shot.evidence_label), start, end, "(w-text_w)/2",
@@ -116,7 +119,33 @@ def layout(plan: ResolvedPlan, style: OverlayStyle) -> list[Text]:
                 if style.brand_tagline:
                     texts.append(Text(style.brand_tagline, at, until, "(w-text_w)/2", 1100,
                                       style.tag_size, style.font_italic, color=style.text_color))
+    for page in captions or []:
+        texts += _lines_centered(page.text, page.start, page.end, style.caption_y, style.caption_size,
+                                 style.font, 30, color=style.text_color)
     texts += _brand_corner(texts, plan, style, label_font)
+    return texts
+
+
+def opening_title(lines: list[str], seconds: float, style: OverlayStyle) -> list[Text]:
+    """The title block of the opening shot: centred as one block around the middle of the frame."""
+    label_font = style.label_font or style.font_bold
+    tracked = style.label_font is not None
+    looks = [(lines[0], label_font, style.tag_size, style.accent_color, 24, tracked)]
+    for i, line in enumerate(lines[1:], start=1):
+        if i == 2:
+            looks.append((line, style.font_bold, style.card_size, style.text_color, 16, False))
+        else:
+            looks.append((line, style.font, style.name_card_size, style.text_color, 28, False))
+    rows = [
+        (track(part, style.label_tracking) if tracked_line else part, font, size, color)
+        for line, font, size, color, width, tracked_line in looks
+        for part in _wrap(line, width)
+    ]
+    y = (HEIGHT - sum(int(size * 1.6) for _, _, size, _ in rows)) // 2
+    texts = []
+    for text, font, size, color in rows:
+        texts.append(Text(text, 0.3, seconds - 0.3, "(w-text_w)/2", y, size, font, color=color))
+        y += int(size * 1.6)
     return texts
 
 
@@ -153,16 +182,24 @@ def true_card_spans(plan: ResolvedPlan) -> list[tuple[float, float]]:
     return spans
 
 
-def filters(plan: ResolvedPlan, style: OverlayStyle, workdir: Path) -> list[str]:
+def filters(plan: ResolvedPlan, style: OverlayStyle, workdir: Path,
+            captions: list[Caption] | None = None) -> list[str]:
     """drawbox/drawtext filters for the whole episode. Text goes via files, so
     quotes, colons and the ellipsis never need escaping."""
-    workdir.mkdir(parents=True, exist_ok=True)
     card = _color(style.card_color)
     chain = [
         f"drawbox=x=0:y=700:w=iw:h=480:color={card}@0.92:t=fill:enable='between(t,{a:.3f},{b:.3f})'"
         for a, b in true_card_spans(plan)
     ]
-    for number, item in enumerate(layout(plan, style)):
+    return chain + drawtext_filters(layout(plan, style, captions), style, workdir)
+
+
+def drawtext_filters(texts: list[Text], style: OverlayStyle, workdir: Path) -> list[str]:
+    """One drawtext filter per text, its words in a file in `workdir`."""
+    workdir.mkdir(parents=True, exist_ok=True)
+    card = _color(style.card_color)
+    chain = []
+    for number, item in enumerate(texts):
         text_file = workdir / f"text_{number:03d}.txt"
         text_file.write_text(item.text, encoding="utf-8")
         box = f":box=1:boxcolor={card}@0.55:boxborderw=14" if item.box else ""

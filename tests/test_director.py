@@ -6,7 +6,7 @@ import pytest
 
 from tih.gates import GateNotApproved, approve
 from tih.paths import RunPaths
-from tih.shots import SceneRule, ShotPlan, example_plan_path, load_plan, plan_path
+from tih.shots import Opening, SceneRule, ShotPlan, example_plan_path, load_plan, plan_path
 from tih.stages import director, registry
 from tih.stages.registry import RunContext, run_stage
 
@@ -118,9 +118,47 @@ def test_shot_plan_answer_format_has_room_for_every_field():
     assert _empty_boxes(anthropic.transform_schema(ShotPlan)) == []
 
 
+def test_shot_plan_answer_format_asks_for_the_opening():
+    schema = anthropic.transform_schema(ShotPlan)
+    assert "opening" in schema["properties"]
+    assert "opening" not in schema.get("required", [])
+    opening = Opening.model_json_schema()
+    assert set(opening["properties"]) == {"place", "keyframe", "motion", "sound", "line"}
+
+
 def test_scene_sides_accept_claude_rows_and_plan_maps():
     rows = SceneRule.model_validate({"clip": 1, "light": "l", "weather": "w",
                                      "sides": [{"who": "booth", "side": "left"}, {"who": "powell", "side": "right"}]})
     plan = SceneRule.model_validate({"clip": 1, "light": "l", "weather": "w",
                                      "sides": {"booth": "left", "powell": "right"}})
     assert rows.sides == plan.sides == {"booth": "left", "powell": "right"}
+
+
+def test_director_prompt_carries_scene_staging_rules():
+    text = (ROOT / "prompts" / "director.md").read_text(encoding="utf-8")
+    assert "`place` is where the camera is looking" in text
+    assert "face_reference: false" in text
+    assert "not a posed picture" in text
+    assert "Write `opening`: one silent 5-second wide establishing shot that the title sits over." in text
+    assert "It is not one of the numbered shots." in text
+    assert "added for you. Do not write a shot for it." not in text
+    assert "about 6 words" in text
+    assert "On a shot where a face speaks, the camera holds still: no push in, no pan." in text
+    assert "`opening` is required." in text
+    assert "No shot is shorter than 1.5 seconds." not in text
+    assert "1.5 to 8.0 seconds" not in text and "mostly 1.5 to 4 seconds" not in text
+    assert ("Each clip is ONE continuous generation of 10 to 15 seconds holding 3 or 4 shots, never more than 4. "
+            "An episode has 5 to 7 clips.") in text
+    assert ("Every shot runs 3 to 7 seconds. A shot with a line lasts at least the line's words / 2.5 plus "
+            "1.5 seconds.") in text
+    assert "a shot has at most ONE cast member whose face is seen" in text
+    assert "WIDE, MEDIUM and POV shots show the crowd, the building or a room and have no cast member's face." in text
+    assert "No TWO shots." in text
+    assert "a head taller" in text and "Never describe relative body size" in text
+    for phrase in (
+        "`keyframe` states where each person is in the frame (left, centre, right; near or far) and where they stand relative to each other. Keep those positions the same in every shot of the scene.",
+        "`motion` gives the expression and the intent behind the line in a few words (for example: jaw tight, he says it like a dare). When a shot has a line, the person starts speaking as the shot begins.",
+        "`sound` lists only what is heard in that shot, two or three specific sounds, no music and no repeats of the word for the same sound.",
+        "`keyframe` names any object or clothing state that carries from the shot before (glove off, page in hand, hat wet), so it does not change between shots.",
+    ):
+        assert phrase in text

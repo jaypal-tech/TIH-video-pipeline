@@ -19,6 +19,8 @@ from tih.briefs import speech_settings
 from tih.media import ffmpeg
 from tih.gates import require_approved
 from tih.production import (
+    StepConfig,
+    Take,
     TakeSet,
     call_step,
     choose,
@@ -29,16 +31,18 @@ from tih.production import (
     take_from,
     write_takes,
 )
-from tih.providers.fal import upload_local
+from tih.providers.fal import GatewayContext, upload_local
 from tih.shots import ResolvedPlan, ResolvedShot
 from tih.stages.registry import RunContext, Stage, register
 
 J_CUT_LEAD = 0.25  # seconds a line may start before its first shot
 WORD = re.compile(r"[a-z0-9]+(?:'[a-z0-9]+)*")
+ORDINAL = re.compile(r"\b(\d+)(?:st|nd|rd|th)\b")
 
 
 def words(text: str) -> list[str]:
     text = text.lower().replace("’", "'").replace("‘", "'")
+    text = ORDINAL.sub(r"\1", text)  # a transcript may write "14th" where the script says "14"
     return WORD.findall(text)
 
 
@@ -166,6 +170,54 @@ def line_pieces(ctx: RunContext, plan: ResolvedPlan, out_dir: Path) -> list[tupl
     return placed
 
 
+def spoken_takes(
+    gateway: GatewayContext,
+    speech: StepConfig,
+    transcribe: StepConfig,
+    step: str,
+    line: str,
+    voice_id: str,
+    direction: str,
+    ref: ShotRef,
+) -> list[Take]:
+    """Speak one whole line until a take says its words; each take's word timings are kept beside its audio."""
+    takes = []
+    for take in range(speech.takes):
+        result = call_step(
+            gateway,
+            speech,
+            step,
+            {
+                "text": speech_text(line, speech.pause_token),
+                "voice_id": voice_id,
+                **speech_settings(direction),
+            },
+            ref,
+            take=take,
+        )
+        reason = None
+        if result.status == "ok" and result.output_paths:
+            audio = Path(result.output_paths[0])
+            heard = call_step(
+                gateway,
+                transcribe,
+                "transcribe",
+                {"audio_url": upload_local(gateway, audio)},
+                ref,
+                take=take,
+                expects_files=False,
+            )
+            transcript = str(heard.payload.get("text", "")) if heard.status == "ok" else ""
+            reason = word_difference(line, transcript)
+            word_timings_path(audio).write_text(
+                json.dumps(heard.payload.get("words", []), indent=1), encoding="utf-8"
+            )
+        takes.append(take_from(result, take, reason=reason))
+        if takes[-1].status == "ok" and takes[-1].reason is None:
+            break
+    return takes
+
+
 def run_voice(ctx: RunContext) -> None:
     require_approved(ctx.paths, "script")
     require_approved(ctx.paths, "look")
@@ -181,40 +233,7 @@ def run_voice(ctx: RunContext) -> None:
         line = " ".join(shot.line for shot in shots)
         lock = require_voice(locks, first.speaker)
         ref = ShotRef(plan.episode, first.clip, beat)
-        takes = []
-        for take in range(speech.takes):
-            result = call_step(
-                gateway,
-                speech,
-                "voice",
-                {
-                    "text": speech_text(line, speech.pause_token),
-                    "voice_id": lock.voice_id,
-                    **speech_settings(first.direction),
-                },
-                ref,
-                take=take,
-            )
-            reason = None
-            if result.status == "ok" and result.output_paths:
-                audio = Path(result.output_paths[0])
-                heard = call_step(
-                    gateway,
-                    transcribe,
-                    "transcribe",
-                    {"audio_url": upload_local(gateway, audio)},
-                    ref,
-                    take=take,
-                    expects_files=False,
-                )
-                transcript = str(heard.payload.get("text", "")) if heard.status == "ok" else ""
-                reason = word_difference(line, transcript)
-                word_timings_path(audio).write_text(
-                    json.dumps(heard.payload.get("words", []), indent=1), encoding="utf-8"
-                )
-            takes.append(take_from(result, take, reason=reason))
-            if takes[-1].status == "ok" and takes[-1].reason is None:
-                break
+        takes = spoken_takes(gateway, speech, transcribe, "voice", line, lock.voice_id, first.direction, ref)
         sets[beat] = choose(ctx, gateway.ledger, "voice", beat, takes)
     write_takes(ctx.paths.stage_dir("voice"), sets)
 

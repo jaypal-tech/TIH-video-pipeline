@@ -1,0 +1,250 @@
+# Episode 1 planned the way the first film was shot, for the Seedance stage tests:
+# one generation per clip (3 or 4 shots, 10-15 s), shots of 3-7 s, one face per
+# shot, no two-shots, no slowed or frozen shots. Lines and overlays are the
+# record script's, so the plan resolves against it like series/lincoln/shots/example.yaml.
+
+episode: 1
+fps: 24
+
+scenes:
+  - clip: 1
+    sides: {booth: left, powell: right}
+    light: Torchlight from screen-left, cool moonlight from above
+    weather: Steady light drizzle, wet ground
+  - clip: 2
+    sides: {lincoln: center, tad: right}
+    light: Candlelight from screen-left inside, torchlight below
+    weather: Steady light drizzle, wet ground
+  - clip: 3
+    sides: {booth: left, powell: right}
+    light: Torchlight from screen-left, cool moonlight from above
+    weather: Steady light drizzle, wet ground
+  - clip: 4
+    sides: {lincoln: center}
+    light: Candlelight from screen-left inside, torchlight below
+    weather: Steady light drizzle, wet ground
+  - clip: 5
+    sides: {booth: left}
+    light: Torchlight from screen-left, cool moonlight from above
+    weather: Steady light drizzle, wet ground
+
+shots:
+  - id: "1.1"
+    beat: e1c1b1
+    duration: 4.0
+    size: MCU
+    cast: [booth]
+    place: L1
+    keyframe: 85mm medium close-up of [BOOTH] in [L1], hat brim low with drizzle beading on it, torchlight on one side of his face, eyes fixed up and past camera
+    motion: He speaks quietly without moving his head; drizzle falls and torches flicker
+    line: You could hit him from here.
+    delivery: face
+    sound: brass band under
+    overlays:
+      - {kind: corner_bug, text: "LINCOLN: THE CONSPIRACY · 1", at: 0.0, duration: 1.0}
+      - {kind: time_super, text: "WASHINGTON · APRIL 11, 1865", at: 0.0, duration: 1.0}
+  - id: "1.2"
+    beat: e1c1b2
+    duration: 3.5
+    size: MCU
+    cast: [powell]
+    place: L1
+    keyframe: 85mm medium close-up of [POWELL] in [L1], rain on his cap, eyes on a distant window
+    motion: Static; he answers flatly with minimal mouth movement
+    line: Not in this crowd.
+    delivery: face
+    overlays:
+      - {kind: name_card, text: "LEWIS POWELL · Confederate veteran · 20", at: 0.0}
+  - id: "1.3"
+    beat: e1c1b3
+    duration: 4.0
+    size: CU
+    cast: [booth]
+    place: L1
+    keyframe: 85mm close-up of [BOOTH] in [L1] turning his head toward camera-left
+    motion: He turns to the man beside him and speaks at once
+    line: Then why are you here?
+    delivery: face
+    overlays:
+      - {kind: name_card, text: "JOHN WILKES BOOTH · America's matinee idol · 26", at: 0.0}
+  - id: "1.4"
+    beat: e1c1b4
+    duration: 3.5
+    size: WIDE
+    cast: []
+    place: L1
+    keyframe: 28mm wide of the crowd in [L1], black umbrellas and torches under the rain
+    motion: The crowd jostles left to right; the camera holds
+    sound: crowd, band
+
+  - id: "2.1"
+    beat: e1c2b1
+    duration: 3.0
+    size: WIDE
+    cast: []
+    place: L1
+    keyframe: 28mm wide low angle from the lawn in [L1], a sea of umbrellas and torches under the rain
+    motion: Slow tilt up; smoke from torches drifts
+    sound: band stops mid-bar
+  - id: "2.2"
+    beat: e1c2b2
+    duration: 4.5
+    size: MCU
+    cast: [lincoln]
+    place: L2
+    keyframe: 85mm medium close-up of [LINCOLN] in [L2], reading from a loose page held in one hand, candlelight from frame left
+    motion: He reads aloud from the first word, eyes on the page
+    line: We meet this evening, not in sorrow,
+    delivery: face
+    overlays:
+      - {kind: name_card, text: "ABRAHAM LINCOLN · President · 56", at: 0.0}
+  - id: "2.3"
+    beat: e1c2b2
+    duration: 4.0
+    size: MEDIUM
+    cast: []
+    place: L1
+    keyframe: 50mm medium shot of upturned hats and umbrellas in [L1], amber torchlight, rain
+    motion: The crowd stands still, listening; rain and torch flicker
+    line: but in gladness of heart.
+    delivery: "off"
+  - id: "2.4"
+    beat: e1c2b3
+    duration: 3.5
+    size: MCU
+    cast: [tad]
+    place: L2
+    keyframe: 85mm medium close-up of [TAD] just inside the window in [L2], holding a fallen page, candlelight
+    motion: He smooths the page and glances up
+    sound: paper rustle
+    overlays:
+      - {kind: name_card, text: "TAD LINCOLN · his son · 12", at: 0.0}
+
+  - id: "3.1"
+    beat: e1c3b1
+    duration: 3.0
+    size: INSERT
+    cast: [booth]
+    place: L1
+    keyframe: Close insert of the black kid glove on [BOOTH]'s hand in [L1], face out of frame, rain, torchlight
+    motion: He pulls the glove off one finger at a time
+    sound: leather creak
+  - id: "3.2"
+    beat: e1c3b1
+    duration: 4.0
+    size: MCU
+    cast: [booth]
+    place: L1
+    keyframe: 85mm medium close-up of [BOOTH] in [L1], glove in hand, eyes on the distant window
+    motion: He speaks low from the first frame, eyes never leaving the window
+    line: One shot, Lewis. In the dark.
+    delivery: face
+  - id: "3.3"
+    beat: e1c3b2
+    duration: 5.0
+    size: MCU
+    cast: [powell]
+    place: L1
+    keyframe: 85mm medium close-up of [POWELL] in [L1], unmoving
+    motion: He answers flatly, no other movement
+    line: And a thousand men on top of me.
+    delivery: face
+  - id: "3.4"
+    beat: e1c3b3
+    duration: 3.0
+    size: CU
+    cast: [booth]
+    place: L1
+    keyframe: 85mm close-up of [BOOTH] in [L1], glove in hand
+    motion: A slow, thin smile forms
+    sound: strings hold
+
+  - id: "4.1"
+    beat: e1c4b1
+    duration: 3.5
+    size: CU
+    cast: [lincoln]
+    place: L2
+    keyframe: 85mm close-up of [LINCOLN] in [L2], a page held close to the candle, the flame lighting his lined face
+    motion: He reads slowly from the first word, eyes on the page
+    line: I would myself prefer
+    delivery: face
+  - id: "4.2"
+    beat: e1c4b1
+    duration: 5.5
+    size: MEDIUM
+    cast: []
+    place: L1
+    keyframe: 50mm medium shot of two bearded men under one umbrella in [L1], seen from behind
+    motion: They turn and exchange a look
+    line: that it were now conferred on the very intelligent,
+    delivery: "off"
+  - id: "4.3"
+    beat: e1c4b2
+    duration: 5.5
+    size: MCU
+    cast: [lincoln]
+    place: L2
+    keyframe: 85mm medium close-up of [LINCOLN] in [L2] lifting his eyes from the page to the crowd below
+    motion: He looks up and speaks out over the crowd
+    line: and on those who serve our cause as soldiers.
+    delivery: face
+    sound: reveal sting
+    overlays:
+      - {kind: super, text: "HE MEANS THE VOTE. FOR SOME BLACK MEN.", at: 0.0, duration: 2.0}
+
+  - id: "5.1"
+    beat: e1c5b1
+    duration: 3.0
+    size: CU
+    cast: [booth]
+    place: L1
+    keyframe: 85mm close-up of [BOOTH] in [L1], rain running down his face, men cheering around him out of focus
+    motion: He stays still and speaks low, sideways
+    line: That means … citizenship.
+    delivery: face
+  - id: "5.2"
+    beat: e1c5b2
+    duration: 5.5
+    size: MCU
+    cast: [booth]
+    place: L1
+    keyframe: 85mm medium close-up of [BOOTH] in [L1], back to the window, a dark shoulder soft in the foreground
+    motion: He speaks quietly, still, one breath
+    line: That is the last speech he will ever make.
+    delivery: face
+  - id: "5.3"
+    beat: e1c5b3
+    duration: 3.0
+    size: WIDE
+    cast: []
+    place: L1
+    keyframe: 28mm wide of [L1], two dark figures seen from behind pushing out through the crowd
+    motion: The two men walk away; the crowd closes behind them
+    sound: rain, distant voice
+  - id: "5.4"
+    beat: e1c5b4
+    duration: 3.5
+    size: MEDIUM
+    cast: []
+    place: L1
+    keyframe: 50mm shot of an empty gap in the crowd in [L1] where a man stood, torches and rain around it
+    motion: Slow push in on the empty space
+    flash_at: 3.0
+    sound: stamp thump on card; flash whoosh
+    overlays:
+      - {kind: true_card, text: "THREE DAYS LATER, HE PICKED THREE TARGETS. ONE NIGHT. ONE HOUR.", at: 0.5, duration: 3.0}
+
+cues:
+  - {id: bed_1, kind: ambience, scene: 1, at: 0.0, duration: 15.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: bed_2, kind: ambience, scene: 2, at: 15.0, duration: 15.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: bed_3, kind: ambience, scene: 3, at: 30.0, duration: 15.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: bed_4, kind: ambience, scene: 4, at: 45.0, duration: 14.5, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: bed_5, kind: ambience, scene: 5, at: 59.5, duration: 15.0, gain_db: -22, prompt: "steady night drizzle on umbrellas, a large outdoor crowd murmuring, distant torches crackling, no music"}
+  - {id: band, kind: music, at: 0.0, duration: 15.0, gain_db: -18, prompt: "diegetic 1860s brass military band playing a march outdoors in rain, heard from within a crowd, ends abruptly mid-bar"}
+  - {id: strings, kind: music, at: 27.0, duration: 33.0, gain_db: -20, prompt: "low sustained cello and viola drone, tense, slowly rising, period drama score, no percussion"}
+  - {id: low_hit, kind: sfx, at: 52.0, duration: 1.0, gain_db: -12, prompt: "low cinematic impact hit"}
+  - {id: reveal, kind: sfx, at: 54.0, duration: 2.0, gain_db: -12, prompt: "short dark orchestral reveal sting"}
+  - {id: deep_hit, kind: sfx, at: 65.0, duration: 1.5, gain_db: -10, prompt: "deep sub boom impact"}
+  - {id: stamp, kind: sfx, at: 71.0, duration: 1.0, gain_db: -8, prompt: "heavy rubber stamp thump on paper, close"}
+  - {id: whoosh, kind: sfx, at: 73.8, duration: 0.6, gain_db: -12, prompt: "bright short whoosh into white"}

@@ -14,7 +14,7 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from tih.bible import Bible, check_forbidden, expand, series_dir, tokens_in
+from tih.bible import NARRATOR_ID, Bible, check_forbidden, expand, series_dir, tokens_in
 from tih.paths import RunPaths
 from tih.story.models import Delivery, Episode, Evidence
 
@@ -49,6 +49,11 @@ class PlannedShot(BaseModel):
     sound: str = ""
     overlays: list[ShotOverlay] = Field(default_factory=list)
 
+    @property
+    def spoken(self) -> str | None:
+        """The words said inside the shot; a narrator's line is laid over it in the edit instead."""
+        return None if self.delivery == Delivery.narration else self.line
+
 
 class Cue(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -66,6 +71,9 @@ Side = Literal["left", "center", "right"]
 SHOT_SECONDS = (1.0, 8.0)
 OPENING_SIZES = ("WIDE", "MEDIUM")
 MAX_SAME_FACE_RUN = 4
+OPENING_LINE_WORDS = 12  # what the narrator can say over the 5-second opening
+NARRATION_WORDS_PER_SECOND = 2.5
+NARRATION_BREATH = 0.5  # seconds a narration shot adds to its words
 
 
 class Placement(BaseModel):
@@ -97,6 +105,18 @@ class SceneRule(BaseModel):
         return value
 
 
+class Opening(BaseModel):
+    """The 5-second establishing shot under the title; not one of the numbered shots. Nobody in it speaks."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    place: str  # a bible place id
+    keyframe: str  # what the camera sees: who is there and what they are doing
+    motion: str  # how the people and the camera move
+    sound: str  # the specific sounds heard, comma-separated
+    line: str | None = None  # the script's first narration line (or its first piece), spoken over the opening
+
+
 class ShotPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -105,6 +125,7 @@ class ShotPlan(BaseModel):
     scenes: list[SceneRule] = Field(default_factory=list)
     shots: list[PlannedShot]
     cues: list[Cue] = Field(default_factory=list)
+    opening: Opening | None = None
 
 
 class ResolvedShot(PlannedShot):
@@ -129,6 +150,8 @@ class ResolvedPlan(BaseModel):
     scenes: list[SceneRule] = Field(default_factory=list)
     shots: list[ResolvedShot]
     cues: list[Cue]
+    opening: Opening | None = None
+    opening_beat: str | None = None  # the script beat whose narration line the opening carries
 
 
 class PlanError(ValueError):
@@ -181,6 +204,25 @@ def resolve_plan(
     rules = {rule.clip: rule for rule in plan.scenes}
     side_errors: set[str] = set()
     previous: PlannedShot | None = None
+    if plan.opening is not None and plan.opening.place not in bible.places:
+        errors.append(f"opening: unknown place {plan.opening.place}")
+    opening_beat = None
+    narrated = [beat for _, beat in beats.values() if beat.line and beat.line.delivery == Delivery.narration]
+    if narrated and bible.narrator is None:
+        errors.append("the script has narration but the bible has no narrator voice")
+    if plan.opening is not None and plan.opening.line is not None:
+        first = next(iter(beats.values()), (0, None))[1]
+        count = len(plan.opening.line.split())
+        if first is None or first.line is None or first.line.delivery != Delivery.narration:
+            errors.append("opening: has a line but the script does not start with narration")
+        elif plan.opening.line not in first.line.text:
+            errors.append("opening: line is not an exact part of the script's first narration line")
+        elif count > OPENING_LINE_WORDS:
+            errors.append(f"opening: line is {count} words; the opening carries at most {OPENING_LINE_WORDS}")
+        else:
+            opening_beat = first.id
+            pieces[first.id] = [plan.opening.line]
+            covered.add(first.id)
 
     for shot in plan.shots:
         where = f"shot {shot.id}"
@@ -239,7 +281,16 @@ def resolve_plan(
                 errors.append(f"{where}: line is not an exact part of the script line")
             else:
                 pieces.setdefault(beat.id, []).append(shot.line)
-                speaker = _speaker_id(beat.line.speaker, bible)
+                narration = beat.line.delivery == Delivery.narration
+                if narration and shot.delivery != Delivery.narration:
+                    errors.append(f"{where}: a narration line needs delivery narration")
+                elif shot.delivery == Delivery.narration and not narration:
+                    errors.append(f"{where}: delivery narration is only for the narrator's lines")
+                count = len(shot.line.split())
+                needed = round(count / NARRATION_WORDS_PER_SECOND + NARRATION_BREATH, 2)
+                if narration and shot.duration < needed:
+                    errors.append(f"{where}: {count} words of narration need {needed:g} s, the shot is {shot.duration:g} s")
+                speaker = NARRATOR_ID if narration else _speaker_id(beat.line.speaker, bible)
                 evidence = beat.line.evidence
                 label = beat.line.evidence_label
                 direction = beat.line.direction
@@ -321,6 +372,8 @@ def resolve_plan(
         scenes=plan.scenes,
         shots=resolved,
         cues=plan.cues,
+        opening=plan.opening,
+        opening_beat=opening_beat,
     )
 
 
