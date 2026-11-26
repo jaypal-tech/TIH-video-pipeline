@@ -27,7 +27,8 @@ from tih.stages import record as _record  # noqa: F401  registers the stage
 from tih.stages import registry
 from tih.stages import scenes as scenes_stage
 from tih.stages.registry import RunContext, run_stage
-from tih.stages.scenes import MAX_TAIL, check_take, played_length, read_timing, run_scenes
+from tih.story.models import Evidence
+from tih.stages.scenes import FAULT_NOTE, MAX_TAIL, check_take, fault_score, played_length, read_timing, run_scenes
 from tih.stages.voice import word_difference
 from tih.story.models import Episode
 from tih.bible import load_bible
@@ -428,13 +429,59 @@ def test_wrong_word_take_is_rejected_and_retaken(staged_ctx, monkeypatch):
     assert [c.settings["take"] for c in calls] == [0, 1]
 
 
-def test_scene_with_no_take_that_says_its_words_stops_the_stage(staged_ctx, monkeypatch):
+def test_scene_with_no_clean_take_keeps_the_earlier_of_equally_wrong_attempts(staged_ctx, monkeypatch):
     plan = load_resolved(staged_ctx)
     target = scene_takes(plan, "seedance")[0]
     _mishear(monkeypatch, staged_ctx.gateway.transport, target.line, times=99)
-    with pytest.raises(NoUsableTake):
-        run_scenes(staged_ctx, "seedance")
-    assert len(_scene_calls(staged_ctx, target.id)) == 2
+    run_scenes(staged_ctx, "seedance")
+    calls = _scene_calls(staged_ctx, target.id)
+    assert len(calls) == 2  # never a third generation
+    chosen = read_takes(staged_ctx, "scenes_seedance")[target.id]
+    first, second = chosen.takes
+    assert chosen.chosen_call_id == first.call_id
+    assert first.note == FAULT_NOTE + word_difference(target.line, target.line.replace("hit", "miss", 1))
+    assert first.reason is None and second.reason is not None  # the later attempt stays rejected
+    record = next(r for r in staged_ctx.gateway.ledger.current() if r.call_id == first.call_id)
+    assert record.kept is True and record.reject_reason == first.note
+    faults = yaml.safe_load((staged_ctx.paths.scope_dir / "scenes_seedance" / "timing.yaml").read_text())["faults"]
+    assert set(faults) == {target.id}
+    assert faults[target.id]["real_words"] == any(s.evidence == Evidence.real_words for s in target.shots)
+
+
+def test_scene_with_no_clean_take_keeps_the_less_wrong_attempt(staged_ctx, monkeypatch):
+    plan = load_resolved(staged_ctx)
+    target = scene_takes(plan, "seedance")[0]
+    transport = staged_ctx.gateway.transport
+    heard = []
+
+    def worse_then_better(payload):
+        if payload.get("text") != target.line:
+            return payload
+        heard.append(1)
+        swaps = [("hit", "miss"), ("here", "there")][:3 - len(heard)]  # first attempt: two wrong words, second: one
+        text, ws = payload["text"], payload["words"]
+        for old, new in swaps:
+            text = text.replace(old, new, 1)
+            ws = [{**w, "text": w["text"].replace(old, new)} for w in ws]
+        return {"text": text, "words": ws}
+
+    _hearing(monkeypatch, transport, worse_then_better)
+    assert "here" in target.line
+    run_scenes(staged_ctx, "seedance")
+    chosen = read_takes(staged_ctx, "scenes_seedance")[target.id]
+    first, second = chosen.takes
+    assert chosen.chosen_call_id == second.call_id and second.note.startswith(FAULT_NOTE)
+    assert first.reason is not None
+
+
+def test_fault_score_counts_wrong_words_and_a_line_cut_off_by_the_clip(plan):
+    take = _talking_take(plan, ["Go on.", "I'm listening."])
+    assert fault_score(take, "Go on. I'm listening.", GO_ON, take.duration) == 0.0
+    one_wrong = fault_score(take, "Go on. I am listening.", GO_ON, take.duration)
+    two_wrong = fault_score(take, "Go away. I am listening.", GO_ON, take.duration)
+    assert 0.0 < one_wrong < two_wrong < 1.0
+    late = [_word(w, 0.0, take.duration + 0.5) for w in ["Go", "on.", "I'm", "listening."]]
+    assert fault_score(take, "Go on. I'm listening.", late, take.duration) == scenes_stage.RUNS_PAST_PENALTY
 
 
 def test_failed_transcription_rejects_the_take(staged_ctx, monkeypatch):
