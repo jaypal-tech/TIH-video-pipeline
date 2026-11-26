@@ -4,7 +4,11 @@ Paid. Each take (one or more shots of a clip, or the silent opening) is one
 text-to-video call. Its sound is transcribed and compared word for word with
 the script, as the voice stage does: a take that adds, drops or changes a word,
 speaks where nobody should, or runs its line past its end is rejected with the
-reason and taken again. The chosen takes' word timings give each lined shot its
+reason and taken again, once. When the second attempt fails too, the attempt closest to
+its script is kept (the share of wrong words, a line cut off by the clip, shots that do not cut where
+planned; the earlier one on a tie), noted "accepted with fault" in the ledger and takes.yaml, and
+listed in timing.yaml under `faults` and on stderr, with real-words lines marked as to fix before
+release. A take with no line is never kept this way: speech there would be captioned. The chosen takes' word timings give each lined shot its
 spoken span and the caption pages for the edit. Each chosen clip's real cuts
 are found too: where they match the plan, timing.yaml gives every shot its real
 start and end in the clip (`shots`), and the edit follows them; where they do
@@ -21,6 +25,7 @@ import json
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, wait
+from difflib import SequenceMatcher
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -34,6 +39,7 @@ from tih.gates import require_approved
 from tih.media import ffmpeg
 from tih.production import (
     StepConfig,
+    Take,
     TakeSet,
     call_step,
     choose,
@@ -50,10 +56,14 @@ from tih.scenes import (
 )
 from tih.shots import PlanError
 from tih.stages.registry import RunContext, Stage, register
-from tih.stages.voice import spoken_words, word_difference, word_timings_path
+from tih.stages.voice import spoken_words, word_difference, word_timings_path, words as script_words
+from tih.story.models import Evidence
 
 TIMING_FILE = "timing.yaml"
 MAX_TAIL = 1.5  # seconds a take may play past its plan: the clip plays as generated, without a long tail
+FAULT_NOTE = "accepted with fault: "  # a take kept although it failed the check, because no attempt passed
+RUNS_PAST_PENALTY = 0.5  # the clip ends before the line does
+CUTS_PENALTY = 0.25  # the clip's shots do not cut where planned, so name labels may land on the wrong face
 
 Timing = tuple[dict[str, tuple[float, float]], list[dict], float]  # spans, word timings, clip seconds
 
@@ -82,6 +92,20 @@ def check_take(take: SceneTake, transcript: str, timings: list[dict], clip_secon
     if heard and float(heard[-1]["end"]) > clip_seconds - 0.1:
         return "line runs past the take"
     return None
+
+
+def fault_score(scene: SceneTake, transcript: str, timings: list[dict], clip_seconds: float) -> float:
+    """How far a rejected attempt is from its script: 0 is perfect, higher is worse.
+
+    The share of the line's words that are wrong or missing (0 to 1), plus a penalty when the clip ends
+    before the line does. The clip's cuts are scored separately, from the video itself.
+    """
+    want, got = script_words(scene.line), script_words(transcript)
+    score = 1.0 - SequenceMatcher(None, want, got).ratio() if want else 0.0
+    heard = spoken_words(timings)
+    if heard and float(heard[-1]["end"]) > clip_seconds - 0.1:
+        score += RUNS_PAST_PENALTY
+    return score
 
 
 def played_length(take: SceneTake, clip_seconds: float) -> float:
@@ -157,12 +181,28 @@ def run_scenes(ctx: RunContext, flow: Flow) -> None:
     for scene, (_, (chosen_spans, words, _)) in zip(scenes, results):
         spans.update({shot: list(span) for shot, span in chosen_spans.items()})
         captions += [page.model_dump(mode="json") for page in caption_pages(shot_takes[scene.id], words)]
+    faults = _faults(scenes, sets)
+    timing = {"spans": spans, "captions": captions, "played": played,
+              "shots": {shot: list(span) for shot, span in real.items()}, "cuts": cuts}
+    if faults:  # a clean run's file is unchanged
+        timing["faults"] = faults
     (stage_dir / TIMING_FILE).write_text(
-        yaml.safe_dump({"spans": spans, "captions": captions, "played": played,
-                        "shots": {shot: list(span) for shot, span in real.items()}, "cuts": cuts},
-                       allow_unicode=True, sort_keys=False, width=10000),
-        encoding="utf-8",
-    )
+        yaml.safe_dump(timing, allow_unicode=True, sort_keys=False, width=10000), encoding="utf-8")
+    for scene_id, fault in faults.items():
+        print(f"{'MUST FIX before release (real words)' if fault['real_words'] else 'Kept with a fault'}: "
+              f"take {scene_id}, {fault['fault']}", file=sys.stderr)
+
+
+def _faults(scenes: list[SceneTake], sets: dict[str, TakeSet]) -> dict[str, dict]:
+    """Each chosen take that failed the check and was kept as the best attempt, with whether it holds real words."""
+    faults = {}
+    for scene in scenes:
+        chosen = sets[scene.id]
+        note = next((take.note for take in chosen.takes if take.call_id == chosen.chosen_call_id), None) or ""
+        if note.startswith(FAULT_NOTE):
+            real_words = any(shot.spoken and shot.evidence == Evidence.real_words for shot in scene.shots)
+            faults[scene.id] = {"fault": note[len(FAULT_NOTE):], "real_words": real_words}
+    return faults
 
 
 MIN_SPLIT_SECONDS = 5.0  # a long scene may be two or three generations, never a short leftover
@@ -205,6 +245,7 @@ def _shoot(
     ref = ShotRef(episode, scene.clip, f"{flow}-take{scene.id}")
     takes = []
     timed: dict[str, Timing] = {}
+    faulty: dict[str, tuple[float, Timing]] = {}
     for take in range(config.takes):
         if interrupted.is_set():
             raise Interrupted(f"{stage} {scene.id}: stopped before take {take}")
@@ -227,12 +268,34 @@ def _shoot(
             if clip < scene.duration - 0.05:
                 reason = "clip is shorter than the take"
             else:
-                reason = _check_sound(gateway, transcribe, scene, video, clip, ref, take, result.call_id, timed)
+                reason = _check_sound(gateway, transcribe, scene, video, clip, ref, take, result.call_id, timed, faulty)
         takes.append(take_from(result, take, reason=reason))
         if takes[-1].status == "ok" and takes[-1].reason is None:
             break
+    fault = None
+    if not any(t.status == "ok" and t.reason is None for t in takes):
+        takes, fault = _keep_best(takes, faulty, scene)
     chosen = choose(ctx, gateway.ledger, stage, scene.id, takes)
-    return chosen, timed[chosen.chosen_call_id]
+    if fault:
+        gateway.ledger.update(chosen.chosen_call_id, kept=True, reject_reason=fault)
+    return chosen, timed.get(chosen.chosen_call_id) or faulty[chosen.chosen_call_id][1]
+
+
+def _keep_best(takes: list[Take], faulty: dict[str, tuple[float, Timing]], scene: SceneTake) -> tuple[list[Take], str | None]:
+    """With no attempt passing, the rejected attempt closest to its script (earliest on a tie), marked as kept
+    with its fault; the same takes and None when none of them can be kept."""
+    candidates = [take for take in takes if take.call_id in faulty]
+    if not candidates:
+        return takes, None
+
+    def distance(take: Take) -> tuple[float, int]:
+        score, (_, _, clip) = faulty[take.call_id]
+        cuts = len(scene.shots) > 1 and real_shots(scene, ffmpeg.cut_times(Path(take.path)), played_length(scene, clip)) is None
+        return score + (CUTS_PENALTY if cuts else 0.0), take.take
+
+    best = min(candidates, key=distance)
+    note = FAULT_NOTE + (best.reason or "")
+    return [take.model_copy(update={"reason": None, "note": note}) if take is best else take for take in takes], note
 
 
 def _check_sound(
@@ -245,8 +308,13 @@ def _check_sound(
     take: int,
     call_id: str,
     timed: dict[str, Timing],
+    faulty: dict[str, tuple[float, Timing]],
 ) -> str | None:
-    """Transcribe one take's sound and check it; a usable take's spans, words and length go into `timed`."""
+    """Transcribe one take's sound and check it; a usable take's spans, words and length go into `timed`.
+
+    A rejected take of a scene with a line, whose words can still be timed, goes into `faulty` with its
+    score: it is the fallback if no attempt of the scene passes.
+    """
     audio = ffmpeg.extract_audio(video, video.with_suffix(".wav"))
     heard = call_step(
         gateway,
@@ -265,14 +333,18 @@ def _check_sound(
     if text.strip() and not words:
         return "transcript has no word timings"
     reason = check_take(scene, heard_text(words), words, clip_seconds)
-    if reason is not None:
-        return reason
+    if reason is not None and not scene.line:
+        return reason  # speech where nobody speaks would be captioned: never kept
     try:
         caption_pages(scene, words)  # the words must page; the pages are placed once every take is in
-        timed[call_id] = (line_spans(scene, words), words, clip_seconds)
+        timing = (line_spans(scene, words), words, clip_seconds)
     except ValueError as error:
-        return f"words could not be timed: {error}"
-    return None
+        return reason or f"words could not be timed: {error}"
+    if reason is None:
+        timed[call_id] = timing
+    else:
+        faulty[call_id] = (fault_score(scene, heard_text(words), words, clip_seconds), timing)
+    return reason
 
 
 def read_timing(
