@@ -8,6 +8,7 @@ bytedance/seedream/v5.5/edit: [prompt, image_urls, image_size, image_size.width,
 fal-ai/kling-video/v3/pro/image-to-video: [start_image_url, end_image_url, prompt, negative_prompt, duration, cfg_scale, generate_audio, shot_type, multi_prompt, multi_prompt.prompt, multi_prompt.duration, elements, elements.frontal_image_url, elements.reference_image_urls, elements.video_url, elements.voice_id, enable_safety_checker]
 # Seedance 2.0 text-to-video: schema fetched 2026-11-25 (it has no seed argument).
 bytedance/seedance-2.0/text-to-video: [prompt, resolution, duration, aspect_ratio, generate_audio, bitrate_mode, codec, return_last_frame, end_user_id]
+bytedance/seedance-2.0/reference-to-video: [prompt, image_urls, audio_urls, video_urls, resolution, duration, aspect_ratio, generate_audio, bitrate_mode, codec, return_last_frame, end_user_id]
 minimax/h3-max/image-to-video: [prompt, image_url, end_image_url, target_audio_url, duration, resolution, prompt_expansion_mode, seed, sync_mode, enable_safety_checker]
 # elevenlabs-api/* are ElevenLabs' own API (elevenlabs.io/docs/api-reference), checked 2026-11-25;
 # voice_id and voice_name are sent in the address / save call, not the design or speech body.

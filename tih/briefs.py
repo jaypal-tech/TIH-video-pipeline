@@ -8,9 +8,10 @@ variants; pipeline.yaml picks one per endpoint with a `{name}` template.
 """
 
 import re
-from typing import TYPE_CHECKING, Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Callable, Literal
 
-from tih.bible import TOKEN, Bible, Character, Narrator, Place
+from tih.bible import TOKEN, Bible, Character, Narrator, Place, References
 from tih.shots import Cue, Opening, ResolvedShot, SceneRule
 
 if TYPE_CHECKING:  # tih.scenes imports tih.stages.voice, which imports this module
@@ -323,7 +324,70 @@ def _seedance_setting(place: Place, rule: SceneRule | None) -> str:
     ) if part)
 
 
-def _seedance_scene(take: "SceneTake", bible: Bible) -> str:
+MAX_REFERENCES = 9  # Seedance 2.0 reference-to-video takes at most nine images
+
+
+@dataclass(frozen=True)
+class SceneReference:
+    """One picture sent with a take: a character's costume or a place, in the order the prompt numbers them."""
+
+    kind: Literal["costume", "place"]
+    key: str  # a character id or a place id
+    image: str
+
+
+def scene_references(take: "SceneTake", references: References) -> list[SceneReference]:
+    """The take's costume pictures (cast order), then its place pictures (order of appearance)."""
+    cast = dict.fromkeys(cid for shot in take.shots for cid in shot.cast)
+    places = dict.fromkeys(shot.place for shot in take.shots)
+    listed = [SceneReference("costume", cid, references.characters[cid].image) for cid in cast if cid in references.characters]
+    listed += [SceneReference("place", pid, references.places[pid].image) for pid in places if pid in references.places]
+    return listed[:MAX_REFERENCES]
+
+
+def _shots_phrase(numbers: list[int], total: int) -> str:
+    if total == 1:
+        return "the shot"
+    if len(numbers) == total:
+        return f"all {COUNT_WORDS[total].lower()} shots"
+    if len(numbers) == 1:
+        return f"shot {numbers[0]}"
+    return "shots " + ", ".join(str(n) for n in numbers[:-1]) + f" and {numbers[-1]}"
+
+
+def _references_paragraph(take: "SceneTake", bible: Bible, listed: list[SceneReference], references: References) -> str:
+    """Says what each numbered picture is for, so no picture can be taken for a person or for another's clothes."""
+    parts, costumes, places = [], [], []
+    for number, ref in enumerate(listed, start=1):
+        if ref.kind == "costume":
+            character = bible.characters[ref.key]
+            costumes.append(character)
+            parts.append(
+                f"@Image{number} is a costume reference for {_screen_name(character)}: a tailor's dress form "
+                f"wearing {references.characters[ref.key].wears}."
+            )
+    if costumes:
+        if len(costumes) == 1:
+            parts.append(f"{pronoun(costumes[0])} wears exactly these clothes.")
+        else:
+            parts.append("Each person wears exactly the clothes of their own reference and no one else's.")
+        parts.append("The dress forms, the headless figures and the plain walls behind them never appear in the film; they only show the clothes.")
+    for number, ref in enumerate(listed, start=1):
+        if ref.kind == "place":
+            numbers = [n for n, shot in enumerate(take.shots, start=1) if shot.place == ref.key]
+            places.append(f"@Image{number}")
+            parts.append(
+                f"@Image{number} is the location of {_shots_phrase(numbers, len(take.shots))}: "
+                f"take {references.places[ref.key].shows} from it."
+            )
+    cast = [bible.characters[cid] for cid in dict.fromkeys(cid for shot in take.shots for cid in shot.cast)]
+    if places and cast:
+        names = " or ".join(_screen_name(character) for character in cast)
+        parts.append(f"The people in {' and '.join(places)} are background extras and are never {names}.")
+    return "References: " + " ".join(parts)
+
+
+def _seedance_scene(take: "SceneTake", bible: Bible, references: References | None = None) -> str:
     shots = take.shots
     style = _plain(bible.style.scene_look or bible.style.look)
     count = f"{COUNT_WORDS[len(shots)]} shots with hard cuts between them, " if len(shots) > 1 else "One continuous shot, no cuts, "
@@ -331,6 +395,9 @@ def _seedance_scene(take: "SceneTake", bible: Bible) -> str:
     paragraphs = [count + style]
     if one_place:
         paragraphs.append("Setting: " + _seedance_setting(bible.places[take.place], shots[0].scene))
+    listed = scene_references(take, references) if references else []
+    if listed:
+        paragraphs.append(_references_paragraph(take, bible, listed, references))
     clock = 0.0
     for number, shot in enumerate(shots, start=1):
         start, clock = clock, clock + shot.duration
@@ -431,10 +498,12 @@ def _within_limit(lines: list[str], style: list[str]) -> str:
     return joined()
 
 
-def scene_brief(take: "SceneTake", bible: Bible, plate: bool) -> dict[str, str]:
-    """Both video models' prompts for one take; Seedance reads every shot, Veo reads the single shot."""
+def scene_brief(take: "SceneTake", bible: Bible, plate: bool, references: References | None = None) -> dict[str, str]:
+    """Both video models' prompts for one take; Seedance reads every shot, Veo reads the single shot.
+
+    With `references`, the Seedance prompt also says what each costume and place picture is."""
     return {
-        "prompt_seedance": _seedance_scene(take, bible),
+        "prompt_seedance": _seedance_scene(take, bible, references),
         "prompt_veo": _veo_scene(take, bible, plate) if len(take.shots) == 1 else "",
     }
 

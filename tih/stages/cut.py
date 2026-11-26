@@ -361,3 +361,5 @@ def run_cut(ctx: RunContext, flow: Flow) -> None:
 
 register(Stage(name="cut_seedance", requires=("scenes_seedance", "narration", "sound"), gate=None,
                run=partial(run_cut, flow="seedance")))
+register(Stage(name="cut_seedance_ref", requires=("scenes_seedance_ref", "narration", "sound"), gate=None,
+               run=partial(run_cut, flow="seedance_ref")))

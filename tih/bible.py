@@ -150,6 +150,31 @@ class Locks(BaseModel):
     places: dict[str, PlaceLock] = Field(default_factory=dict)
 
 
+class CostumeReference(BaseModel):
+    """A picture of one character's clothes alone (no face), for a video model that refuses faces."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    image: str
+    wears: str  # what the picture shows, as the prompt names it: "his flat-crowned hat, ..."
+
+
+class PlaceReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    image: str
+    shows: str  # what to take from the picture: "the crowd, umbrellas, torches, mud, smoke and light"
+
+
+class References(BaseModel):
+    """Costume and place pictures sent to Seedance's reference flow; faces stay in words."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    characters: dict[str, CostumeReference] = Field(default_factory=dict)
+    places: dict[str, PlaceReference] = Field(default_factory=dict)
+
+
 class NotLocked(RuntimeError):
     """A character needed by a shot has no locked look or voice yet."""
 
@@ -181,6 +206,13 @@ def load_locks(series: str) -> Locks:
     if not path.exists():
         return Locks()
     return Locks.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+
+
+def load_references(series: str) -> References:
+    path = series_dir(series) / "references.yaml"
+    if not path.exists():
+        return References()
+    return References.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
 
 
 def save_locks(series: str, locks: Locks) -> None:

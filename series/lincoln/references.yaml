@@ -1,0 +1,25 @@
+# Pictures sent to Seedance's reference flow (flow seedance_ref). Costume pictures show clothes only (no
+# face: Seedance refuses face images), so faces stay in the bible's words. Place pictures show the setting.
+characters:
+  booth:
+    image: series/lincoln/assets/references/booth_costume.png
+    wears: his flat-crowned hat, white collar, black cravat, dark frock coat with velvet collar and leather gloves
+  powell:
+    image: series/lincoln/assets/references/powell_costume.png
+    wears: his grey forage cap and dark sack coat
+  lincoln:
+    image: series/lincoln/assets/references/lincoln_costume.png
+    wears: his black frock coat, white shirt and black bow tie
+  tad:
+    image: series/lincoln/assets/references/tad_costume.png
+    wears: his small dark wool jacket and white collar
+places:
+  L1:
+    image: series/lincoln/assets/references/L1.png
+    shows: the White House front, the crowd, umbrellas, torches, smoke and light
+  L1R:
+    image: series/lincoln/assets/references/L1R.png
+    shows: the crowd, umbrellas, torches, mud, smoke and light
+  L2:
+    image: series/lincoln/assets/references/L2.png
+    shows: the window, the drapes, the candle and the light

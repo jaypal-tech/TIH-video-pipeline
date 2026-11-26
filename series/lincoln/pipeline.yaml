@@ -98,6 +98,20 @@ steps:
       resolution: 720p
       generate_audio: true
 
+  scene_seedance_ref: # the same route plus costume and place pictures; faces stay in words, as Seedance refuses face images
+    endpoint: bytedance/seedance-2.0/reference-to-video
+    estimate_usd: 4.60 # the 15 s maximum at $0.3034/s, rounded up
+    takes: 2
+    parallel: 4
+    duration_range: [4, 15]
+    arguments:
+      prompt: "{prompt_seedance}"
+      image_urls: "{image_urls}"
+      duration: "{duration}"
+      aspect_ratio: "9:16"
+      resolution: 720p
+      generate_audio: true
+
   speech: # ElevenLabs directly, with the voice designed above; v3 reads … as a pause itself
     endpoint: elevenlabs-api/text-to-speech
     estimate_usd: 0.03

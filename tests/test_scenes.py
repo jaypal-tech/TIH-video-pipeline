@@ -31,7 +31,8 @@ from tih.story.models import Evidence
 from tih.stages.scenes import FAULT_NOTE, MAX_TAIL, check_take, fault_score, played_length, read_timing, run_scenes
 from tih.stages.voice import word_difference
 from tih.story.models import Episode
-from tih.bible import load_bible
+from tih.bible import CostumeReference, NotLocked, PlaceReference, References, load_bible
+from tih.briefs import scene_references
 
 ROOT = Path(__file__).parents[1]
 FILM_PLAN = ROOT / "tests" / "fixtures" / "film_plan.yaml"  # one generation per clip, as the first film
@@ -386,6 +387,84 @@ def test_seedance_flow_uploads_no_image_and_calls_only_text_to_video(staged_ctx,
     run_scenes(staged_ctx, "seedance")
     assert {e for e in asked if "video" in e} == {"bytedance/seedance-2.0/text-to-video"}
     assert uploaded and all(Path(path).suffix == ".wav" for path in uploaded)
+
+
+PNG = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360f8ffff3f0005fe02fea7d8a1b60000000049454e44ae426082")
+
+
+@pytest.fixture
+def reference_files(tmp_path, monkeypatch):
+    """A costume picture for every character and a place picture for every place, as real files."""
+    bible = load_bible("lincoln")
+    folder = tmp_path / "pictures"
+    folder.mkdir()
+
+    def picture(name):
+        (folder / f"{name}.png").write_bytes(PNG + name.encode())  # different bytes, so different uploads
+        return str(folder / f"{name}.png")
+
+    refs = References(
+        characters={cid: CostumeReference(image=picture(cid), wears=f"the {cid}'s clothes") for cid in bible.characters},
+        places={pid: PlaceReference(image=picture(pid), shows=f"the {pid} place") for pid in bible.places},
+    )
+    monkeypatch.setattr(scenes_stage, "load_references", lambda series: refs)
+    return refs
+
+
+def test_reference_flow_sends_each_takes_pictures_to_the_reference_endpoint(staged_ctx, reference_files, monkeypatch):
+    transport = staged_ctx.gateway.transport
+    asked = []
+    submit = transport.submit
+
+    def recording_submit(endpoint, arguments):
+        asked.append((endpoint, arguments))
+        return submit(endpoint, arguments)
+
+    monkeypatch.setattr(transport, "submit", recording_submit)
+    run_scenes(staged_ctx, "seedance_ref")
+    plan = load_resolved(staged_ctx)
+    reference_calls = [a for e, a in asked if e == "bytedance/seedance-2.0/reference-to-video"]
+    text_calls = [a for e, a in asked if e == "bytedance/seedance-2.0/text-to-video"]
+    takes = scene_takes(plan, "seedance_ref")
+    assert len(reference_calls) == len(takes)
+    assert sorted(len(a["image_urls"]) for a in reference_calls) == sorted(len(scene_references(t, reference_files)) for t in takes)  # takes run in parallel, so any order
+    assert len(text_calls) == 1 and "image_urls" not in text_calls[0]  # only the silent opening has no pictures
+    assert all("@Image1" in a["prompt"] for a in reference_calls)
+
+
+def test_reference_flow_writes_its_own_stage_and_ledger_names(staged_ctx, reference_files):
+    run_scenes(staged_ctx, "seedance_ref")
+    plan = load_resolved(staged_ctx)
+    takes = read_takes(staged_ctx, "scenes_seedance_ref")
+    assert set(takes) == {"0", *(t.id for t in scene_takes(plan, "seedance_ref"))}
+    assert not (staged_ctx.paths.scope_dir / "scenes_seedance").exists()
+    assert {r.shot for r in staged_ctx.gateway.ledger.current() if r.step == "scene"} == {
+        f"seedance_ref-take{i}" for i in takes
+    }
+
+
+def test_reference_flow_stops_before_spending_when_a_picture_is_missing(staged_ctx, reference_files):
+    first = next(iter(reference_files.characters.values()))
+    Path(first.image).unlink()
+    before = len(staged_ctx.gateway.ledger.current())
+    with pytest.raises(NotLocked, match="picture"):
+        run_scenes(staged_ctx, "seedance_ref")
+    assert len(staged_ctx.gateway.ledger.current()) == before
+
+
+def test_a_take_with_no_picture_falls_back_to_text_to_video(staged_ctx, monkeypatch):
+    monkeypatch.setattr(scenes_stage, "load_references", lambda series: References())
+    transport = staged_ctx.gateway.transport
+    asked = []
+    submit = transport.submit
+
+    def recording_submit(endpoint, arguments):
+        asked.append(endpoint)
+        return submit(endpoint, arguments)
+
+    monkeypatch.setattr(transport, "submit", recording_submit)
+    run_scenes(staged_ctx, "seedance_ref")
+    assert {e for e in asked if "video" in e} == {"bytedance/seedance-2.0/text-to-video"}
 
 
 def test_veo_flow_is_not_built_yet(staged_ctx):

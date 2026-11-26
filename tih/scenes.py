@@ -9,8 +9,9 @@ from tih.bible import NARRATOR_ID
 from tih.shots import ResolvedPlan, ResolvedShot
 from tih.stages.voice import spoken_words, words
 
-Flow = Literal["seedance", "veo"]
-FLOWS: tuple[Flow, ...] = ("seedance", "veo")
+Flow = Literal["seedance", "seedance_ref", "veo"]
+FLOWS: tuple[Flow, ...] = ("seedance", "seedance_ref", "veo")
+PACKED_FLOWS: tuple[Flow, ...] = ("seedance", "seedance_ref")  # flows whose takes hold several shots of a clip
 MAX_TAKE_SECONDS = 15.0
 MAX_TAKE_SHOTS = 4
 OPENING_ID = "0"
@@ -65,7 +66,7 @@ def scene_takes(plan: ResolvedPlan, flow: Flow) -> list[SceneTake]:
     for shot in plan.shots:
         current = groups[-1] if groups else None
         fits = (
-            flow == "seedance"
+            flow in PACKED_FLOWS
             and current is not None
             and current[0].clip == shot.clip
             and not _alone(shot)

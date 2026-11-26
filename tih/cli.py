@@ -42,9 +42,10 @@ from tih.stages import voice as _voice  # noqa: F401  registers the stage
 from tih.stages import writers_room as _writers_room  # noqa: F401  registers the stage
 from tih.stages.registry import DONE_FILE, RunContext, run_stage
 
-# The order an episode runs in after Script Lock and Look Lock, per flow. Only Seedance is built.
+# The order an episode runs in after Script Lock and Look Lock, per flow. Seedance (words only) and
+# seedance_ref (the same, plus costume and place pictures) are built; veo is not.
 FLOW_STAGES: dict[str, tuple[str, ...]] = {
-    flow: ("director", "shotplan", "narration", f"scenes_{flow}", "sound", f"cut_{flow}") for flow in ("seedance",)
+    flow: ("director", "shotplan", "narration", f"scenes_{flow}", "sound", f"cut_{flow}") for flow in ("seedance", "seedance_ref")
 }
 
 app = typer.Typer(no_args_is_help=True)
@@ -91,7 +92,7 @@ def run(
 def episode(
     number: int,
     series: str = typer.Option(..., "--series"),
-    flow: str = typer.Option(..., "--flow", help="How scenes are made: seedance (veo is not built yet)."),
+    flow: str = typer.Option(..., "--flow", help="How scenes are made: seedance, seedance_ref (veo is not built yet)."),
     start: str = typer.Option("director", "--from", help="First stage to run."),
     force: bool = typer.Option(False, "--force", help="Re-run stages from --from on."),
     root: Path = typer.Option(Path("runs"), "--root"),
@@ -167,7 +168,7 @@ def prepare_rehearsal(number: int, series: str, root: Path, source: Path = Path(
 def rehearse(
     number: int,
     series: str = typer.Option(..., "--series"),
-    flow: str = typer.Option("seedance", "--flow", help="How scenes are made: seedance (veo is not built yet)."),
+    flow: str = typer.Option("seedance", "--flow", help="How scenes are made: seedance, seedance_ref (veo is not built yet)."),
     root: Path = typer.Option(Path("runs-dry"), "--root"),
 ) -> None:
     """Run an episode end to end with placeholder media: $0, real timing and text."""

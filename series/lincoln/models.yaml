@@ -26,6 +26,9 @@ endpoints:
   bytedance/seedance-2.0/text-to-video: # rates checked 2026-11-25; 720p with audio
     unit: seconds
     rate: 0.3034
+  bytedance/seedance-2.0/reference-to-video: # fal page rate, no reference video attached; 720p with audio
+    unit: seconds
+    rate: 0.3024
   minimax/h3-max/image-to-video:
     unit: seconds
     tier_key: resolution

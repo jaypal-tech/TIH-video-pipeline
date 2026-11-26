@@ -10,13 +10,15 @@ from tih.briefs import (
     voice_design_brief, voice_preview, _setting_words, _sound_list,
 )
 from tih.paths import RunPaths
-from tih.scenes import FLOWS, scene_takes
+from tih.scenes import scene_takes
 from tih.shots import Cue, Opening, example_plan_path, load_plan, resolve_plan
 from tih.stages import record  # noqa: F401  registers the record stage
 from tih.stages.registry import RunContext, run_stage
 from tih.story.models import Episode
 
 ROOT = Path(__file__).parents[1]
+
+PROMPT_FLOWS = ("seedance", "veo")  # one prompt per model family; seedance_ref uses Seedance's prompt
 
 
 @pytest.fixture
@@ -154,7 +156,7 @@ def test_dialogue_wording_follows_the_guide(plan, bible):
         assert ' says: "' not in prompt
 
 
-@pytest.mark.parametrize("flow", FLOWS)
+@pytest.mark.parametrize("flow", PROMPT_FLOWS)
 def test_only_spoken_lines_are_quoted(plan, bible, flow):
     for take in scene_takes(plan, flow):
         prompt = scene_brief(take, bible, plate=True)[f"prompt_{flow}"]
@@ -188,7 +190,7 @@ def test_veo_describes_an_unreferenced_face_in_words(plan, bible):
 
 
 def test_real_names_never_reach_a_prompt(plan, bible):
-    prompts = [p for flow in FLOWS for t in scene_takes(plan, flow) for p in scene_brief(t, bible, plate=False).values()]
+    prompts = [p for flow in PROMPT_FLOWS for t in scene_takes(plan, flow) for p in scene_brief(t, bible, plate=False).values()]
     prompts += opening_brief(bible.places[plan.shots[0].place], bible, plate=True).values()
     for prompt in prompts:
         assert "Lincoln" not in prompt and "Booth" not in prompt and "Powell" not in prompt
@@ -280,7 +282,7 @@ def _descriptions(bible):
 
 
 def _every_prompt(plan, bible):
-    for flow in FLOWS:
+    for flow in PROMPT_FLOWS:
         for take in scene_takes(plan, flow):
             for plate in (True, False):
                 yield flow, take, plate, scene_brief(take, bible, plate)[f"prompt_{flow}"]
@@ -347,7 +349,7 @@ def _audio_items(prompt):
 
 def test_a_line_from_outside_the_cast_is_an_off_screen_voice(plan, bible):
     seen = 0
-    for flow in FLOWS:
+    for flow in PROMPT_FLOWS:
         for take in scene_takes(plan, flow):
             prompts = scene_brief(take, bible, plate=True)
             prompt = prompts[f"prompt_{flow}"]

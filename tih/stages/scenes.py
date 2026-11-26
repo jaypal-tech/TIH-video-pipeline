@@ -33,8 +33,8 @@ from typing import Any
 import yaml
 
 from tih.assets import ShotRef
-from tih.bible import load_bible
-from tih.briefs import opening_brief, scene_brief
+from tih.bible import NotLocked, load_bible, load_references
+from tih.briefs import opening_brief, scene_brief, scene_references
 from tih.gates import require_approved
 from tih.media import ffmpeg
 from tih.production import (
@@ -120,38 +120,51 @@ def played_length(take: SceneTake, clip_seconds: float) -> float:
 
 
 def run_scenes(ctx: RunContext, flow: Flow) -> None:
-    if flow != "seedance":
+    if flow not in ("seedance", "seedance_ref"):
         raise NotImplementedError("the veo flow is not built yet")
     require_approved(ctx.paths, "script")
     require_approved(ctx.paths, "look")
     plan = load_resolved(ctx)
     bible = load_bible(ctx.paths.series)
     steps = load_pipeline(ctx.paths.series).steps
-    config, transcribe = steps["scene_seedance"], steps["transcribe"]
+    text_config, transcribe = steps["scene_seedance"], steps["transcribe"]
     gateway = gateway_for(ctx)
     stage = f"scenes_{flow}"
     scenes = [opening_take(plan), *scene_takes(plan, flow)]
     _one_take_per_clip(scenes[1:])
 
+    # Seedance with references: a take's costume and place pictures (the silent opening has none); a take
+    # with no picture is the plain text-to-video route
+    references = load_references(ctx.paths.series) if flow == "seedance_ref" else None
+    pictures = [
+        scene_references(scene, references) if references and scene.id != OPENING_ID else [] for scene in scenes
+    ]
+    missing = sorted({ref.image for listed in pictures for ref in listed if not Path(ref.image).is_file()})
+    if missing:
+        raise NotLocked(f"Missing reference picture(s): {', '.join(missing)}")
+    config = steps["scene_seedance_ref"] if flow == "seedance_ref" else text_config
+    configs = [config if listed else text_config for listed in pictures]
+    urls = [[upload_local(gateway, Path(ref.image)) for ref in listed] or None for listed in pictures]
+
     briefs = [
         opening_brief(bible.places[scene.place], bible, False, opening=plan.opening)
-        if scene.id == OPENING_ID else scene_brief(scene, bible, False)
+        if scene.id == OPENING_ID else scene_brief(scene, bible, False, references)
         for scene in scenes
     ]
     failed = threading.Event()  # a take failed: no take starts after it
     interrupted = threading.Event()  # Ctrl-C: no take starts another paid attempt either
 
-    def shoot(scene: SceneTake, prompts: dict[str, Any]) -> tuple[TakeSet, Timing] | None:
+    def shoot(scene: SceneTake, prompts: dict[str, Any], step: StepConfig, image_urls: list[str] | None) -> tuple[TakeSet, Timing] | None:
         if failed.is_set() or interrupted.is_set():
             return None
         try:
-            return _shoot(ctx, gateway, config, transcribe, stage, flow, plan.episode, scene, prompts, interrupted)
+            return _shoot(ctx, gateway, step, transcribe, stage, flow, plan.episode, scene, prompts, interrupted, image_urls)
         except Exception:
             failed.set()
             raise
 
     pool = ThreadPoolExecutor(max_workers=config.parallel, thread_name_prefix=stage)
-    futures = [pool.submit(shoot, scene, prompts) for scene, prompts in zip(scenes, briefs)]
+    futures = [pool.submit(shoot, *job) for job in zip(scenes, briefs, configs, urls)]
     try:
         wait(futures)
     except BaseException:
@@ -240,6 +253,7 @@ def _shoot(
     scene: SceneTake,
     prompts: dict[str, Any],
     interrupted: threading.Event,
+    image_urls: list[str] | None = None,
 ) -> tuple[TakeSet, Timing]:
     """Take one scene until an attempt says its words; its chosen take and that take's timing."""
     ref = ShotRef(episode, scene.clip, f"{flow}-take{scene.id}")
@@ -255,7 +269,7 @@ def _shoot(
             "scene",
             {
                 **prompts,
-                "image_urls": None,
+                "image_urls": image_urls,
                 "duration": str(request_seconds(scene, config.duration_range)),
             },
             ref,
@@ -369,3 +383,4 @@ def read_shots(ctx: RunContext, flow: Flow) -> tuple[dict[str, tuple[float, floa
 
 
 register(Stage(name="scenes_seedance", requires=("shotplan",), gate="look", run=partial(run_scenes, flow="seedance")))
+register(Stage(name="scenes_seedance_ref", requires=("shotplan",), gate="look", run=partial(run_scenes, flow="seedance_ref")))
